@@ -974,8 +974,8 @@ async def main() -> None:
                         w_i, l_i, c_i = _stats(txt)
                         wanted = {"words": w_i, "lines": l_i, "chars": c_i}
                         if it.get("stats") == wanted:
-                            break                # numbers already correct
-                        it["stats"] = wanted     # inject & re‑measure
+                            break          # already correct
+                        it["stats"] = wanted
 
                 payload = {"items": current_objs}
 
@@ -1138,7 +1138,7 @@ async def main() -> None:
             ranked = ranked[: args.stats_top]
 
         header_txt = "File statistics:"
-        if len(ranked) == 1:                          # ← NEW branch
+        if len(ranked) == 1:
             header_txt = "File statistics (top 1):"
         elif args.stats_top and args.stats_top < len(stats_files):
             header_txt = f"File statistics (top {len(ranked)}):"

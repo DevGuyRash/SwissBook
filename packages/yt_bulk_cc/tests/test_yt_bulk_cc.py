@@ -199,7 +199,7 @@ def test_convert_concat_json(tmp_path: Path, dest_fmt):
     Regression: must not raise AttributeError ('SimpleNamespace' has no attr .text)
     and must create exactly one output file.
     """
-    # Step‑1: make a concatenated JSON file
+    # Step-1: make a concatenated JSON file
     run_cli(
         tmp_path,
         "dummy",                # URL ignored by patched detect()
@@ -210,7 +210,7 @@ def test_convert_concat_json(tmp_path: Path, dest_fmt):
     combo = tmp_path / "combo.json"
     assert combo.exists()
 
-    # Step‑2: convert it
+    # Step-2: convert it
     run_cli(
         tmp_path,
         "--convert", str(combo),
@@ -219,7 +219,7 @@ def test_convert_concat_json(tmp_path: Path, dest_fmt):
     converted = combo.with_suffix(f".{ytb.EXT[dest_fmt]}")
     assert converted.exists(), "converter did not write output file"
 
-    # Quick smoke‑checks on the result
+    # Quick smoke-checks on the result
     out = converted.read_text()
     assert out.strip(), "converted file is empty"
     if dest_fmt in ("text", "pretty"):
@@ -285,12 +285,12 @@ def _stats_line_tuple(txt: str) -> tuple[int, int, int]:
 
 
 # ---------------------------------------------------------------------------
-# NEW: stats‑off validation
+# NEW: stats-off validation
 # ---------------------------------------------------------------------------
 @pytest.mark.usefixtures("patch_transcript", "patch_scrapetube", "patch_detect")
 @pytest.mark.parametrize("fmt", ["srt", "webvtt", "text", "pretty"])
 def test_no_stats_header_absent(tmp_path: Path, fmt):
-    """--no-stats should omit the header in every non‑JSON format."""
+    """--no-stats should omit the header in every non-JSON format."""
     run_cli(tmp_path, "dummy", "-f", fmt, "-n", "1", "--no-stats")
     f = next(tmp_path.glob(f"*.{ytb.EXT[fmt]}"))
     first = f.read_text().lstrip().splitlines()[0]
@@ -299,7 +299,7 @@ def test_no_stats_header_absent(tmp_path: Path, fmt):
 
 @pytest.mark.usefixtures("patch_transcript", "patch_scrapetube", "patch_detect")
 def test_json_concat_no_stats_key(tmp_path: Path):
-    """With --no-stats, concatenated JSON must NOT contain a top‑level stats obj."""
+    """With --no-stats, concatenated JSON must NOT contain a top-level stats obj."""
     run_cli(
         tmp_path,
         "dummy",
@@ -481,7 +481,7 @@ def test_json_stats_are_accurate(tmp_path: Path):
                        data["stats"]["lines"],
                        data["stats"]["chars"]), "JSON stats header mismatch"
 
-# ────────────────────────── NEW: split‑cap sanity  ────────────────────────── #
+# ────────────────────────── NEW: split-cap sanity  ────────────────────────── #
 @pytest.mark.usefixtures("patch_transcript", "patch_scrapetube", "patch_detect")
 @pytest.mark.parametrize("fmt", ["srt", "webvtt", "text", "pretty"])
 @pytest.mark.parametrize(
@@ -489,7 +489,7 @@ def test_json_stats_are_accurate(tmp_path: Path):
 )
 def test_split_limit_respected(tmp_path: Path, fmt: str, unit: str, limit: int):
     """
-    End‑to‑end: download 3 stub videos, concat with a *tiny* split threshold
+    End-to-end: download 3 stub videos, concat with a *tiny* split threshold
     and verify every emitted file honours that cap **including** the header.
     """
     run_cli(
@@ -517,7 +517,7 @@ def test_split_limit_respected(tmp_path: Path, fmt: str, unit: str, limit: int):
 
 def test_runlog_summary_is_last(tmp_path, patch_transcript, patch_scrapetube,
                                 patch_detect):
-    """Summary must be the final non‑blank line in the run‑log."""
+    """Summary must be the final non-blank line in the run-log."""
     lf = tmp_path / "run.log"
     run_cli(tmp_path, "dummy", "-f", "text", "-n", "1",
             "-L", str(lf))          # force explicit log path
@@ -550,7 +550,7 @@ def test_convert_video_separators(tmp_path, patch_transcript, patch_scrapetube,
     assert out.count("────") == 2      # one per video
 
 # ────────────────────────── NEW BEHAVIOUR TESTS ──────────────────────────
-# These tests exercise the S‑, J‑, SP‑ and UI‑series guarantees that were
+# These tests exercise the S-, J-, SP- and UI-series guarantees that were
 # recently fixed but previously uncovered.  All rely on the run_cli() helper
 # and the patched network stubs already defined in this suite.
 
@@ -566,9 +566,9 @@ def _strip_ansi(txt: str) -> str:
 
 def _stats_lines(block: str) -> list[str]:
     """
-    Return the non‑blank *lines* in the “File statistics” section.
+    Return the non-blank *lines* in the "File statistics" section.
 
-    `block` must already be ANSI‑stripped.
+    `block` must already be ANSI-stripped.
     """
     m = re.search(r"File statistics[^\n]*\n(.*?)(?:\n\s*$|\n\n)", block, re.S)
     if not m:
@@ -577,21 +577,21 @@ def _stats_lines(block: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# S‑01  +  S‑02  (ordering  &  dynamic index width)
+# S-01  +  S-02  (ordering  &  dynamic index width)
 # ---------------------------------------------------------------------------
 @pytest.mark.usefixtures("patch_transcript", "patch_scrapetube", "patch_detect")
 def test_stats_block_order_and_index_width(tmp_path: Path, capsys):
-    """The stats list must be char‑descending and zero‑padded to the max index."""
+    """The stats list must be char-descending and zero-padded to the max index."""
     run_cli(tmp_path, "dummy", "-f", "text", "-n", "5")          # no --concat
     out   = _strip_ansi(capsys.readouterr().out)
     lines = _stats_lines(out)
 
-    # ---- S‑02  index padding ------------------------------------------------
+    # ---- S-02  index padding ------------------------------------------------
     pad = len(str(len(lines))) or 1
     for idx, line in enumerate(lines, 1):
         assert re.match(fr"\s*{idx:0{pad}d}\.", line), f"bad index width: {line!r}"
 
-    # ---- S‑01  descending char‑count order ----------------------------------
+    # ---- S-01  descending char-count order ----------------------------------
     char_counts = [
         int(re.search(r"(\d[\d,]*)\s*c\b", l).group(1).replace(",", ""))
         for l in lines
@@ -600,14 +600,14 @@ def test_stats_block_order_and_index_width(tmp_path: Path, capsys):
 
 
 # ---------------------------------------------------------------------------
-# S‑03   (--stats‑top cap)     &     S‑04  (--stats‑top 0 → all)
+# S-03   (--stats-top cap)     &     S-04  (--stats-top 0 → all)
 # ---------------------------------------------------------------------------
 @pytest.mark.usefixtures("patch_transcript", "patch_scrapetube", "patch_detect")
 def test_stats_top_cap_and_all(tmp_path: Path, capsys):
     # cap = 3  → exactly 3 lines
     run_cli(tmp_path, "dummy", "-f", "json", "--stats-top", "3", "-n", "10")
     lines = _stats_lines(_strip_ansi(capsys.readouterr().out))
-    assert len(lines) == 3, "stats‑top 3 not honoured"
+    assert len(lines) == 3, "stats-top 3 not honoured"
 
     # cap = 0  → show *all* files
     capsys.readouterr()                  # clear buffer
@@ -615,11 +615,11 @@ def test_stats_top_cap_and_all(tmp_path: Path, capsys):
     out    = _strip_ansi(capsys.readouterr().out)
     lines  = _stats_lines(out)
     files  = list(tmp_path.glob("*.json"))
-    assert len(lines) == len(files), "stats‑top 0 did not show all files"
+    assert len(lines) == len(files), "stats-top 0 did not show all files"
 
 
 # ---------------------------------------------------------------------------
-# J‑01  (per‑item stats in concatenated JSON)
+# J-01  (per-item stats in concatenated JSON)
 # ---------------------------------------------------------------------------
 @pytest.mark.usefixtures("patch_transcript", "patch_scrapetube", "patch_detect")
 def test_item_stats_inside_concat_json(tmp_path: Path):
@@ -637,11 +637,11 @@ def test_item_stats_inside_concat_json(tmp_path: Path):
             item["stats"]["words"],
             item["stats"]["lines"],
             item["stats"]["chars"],
-        ), "per‑item stats mismatch"
+        ), "per-item stats mismatch"
 
 
 # ---------------------------------------------------------------------------
-# J‑02  (stats in single‑file JSON)  +  J‑03  (trailing newline)
+# J-02  (stats in single-file JSON)  +  J-03  (trailing newline)
 # ---------------------------------------------------------------------------
 @pytest.mark.usefixtures("patch_transcript", "patch_scrapetube", "patch_detect")
 def test_single_json_stats_and_trailing_newline(tmp_path: Path):
@@ -650,20 +650,20 @@ def test_single_json_stats_and_trailing_newline(tmp_path: Path):
     txt   = jfile.read_text()
     obj   = json.loads(txt)
 
-    # trailing newline (J‑03)
+    # trailing newline (J-03)
     assert txt.endswith("\n"), "JSON does not end with newline"
 
-    # stats match exact file bytes (J‑02)
+    # stats match exact file bytes (J-02)
     w, l, c = ytb._stats(txt)
     assert (w, l, c) == (
         obj["stats"]["words"],
         obj["stats"]["lines"],
         obj["stats"]["chars"],
-    ), "top‑level stats mismatch"
+    ), "top-level stats mismatch"
 
 
 # ---------------------------------------------------------------------------
-# SP‑01  (split limit 5 000 chars honoured for concatenated JSON)
+# SP-01  (split limit 5 000 chars honoured for concatenated JSON)
 # ---------------------------------------------------------------------------
 @pytest.mark.usefixtures("patch_transcript", "patch_scrapetube", "patch_detect")
 def test_json_split_char_limit_respected(tmp_path: Path):
@@ -685,7 +685,7 @@ def test_json_split_char_limit_respected(tmp_path: Path):
 
 
 # ---------------------------------------------------------------------------
-# UI‑01  (header wording when only a single entry is shown)
+# UI-01  (header wording when only a single entry is shown)
 # ---------------------------------------------------------------------------
 @pytest.mark.usefixtures("patch_transcript", "patch_scrapetube", "patch_detect")
 def test_stats_header_singular_plural(tmp_path: Path, capsys):
@@ -695,3 +695,63 @@ def test_stats_header_singular_plural(tmp_path: Path, capsys):
         if "File statistics" in l
     )
     assert hdr_line.strip() == "File statistics (top 1):", "header wording incorrect"
+
+
+# ────────────────── Hardening / resilience tests ──────────────────────
+"""
+Hardening / resilience tests that go beyond the spec-checklist:
+
+* retry/back-off logic for TooManyRequests
+* Windows MAX_PATH shortening safeguard
+"""
+
+# ──────────────────────────────────────────────────────────────────────────
+# 1. Retry logic – TooManyRequests raises twice, then succeeds
+# ──────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
+def test_retry_too_many_requests(monkeypatch, tmp_path: Path, capsys):
+    """_grab() must back-off and still succeed after transient 429 errors."""
+
+    calls = {"n": 0}
+
+    def _fake_get_transcript(*_a, **_kw):
+        calls["n"] += 1
+        if calls["n"] < 3:  # first two attempts → fail
+            raise ytb.TooManyRequests("slow down")
+        # third attempt → return minimal cue
+        return [{"start": 0.0, "duration": 1.0, "text": "OK"}]
+
+    monkeypatch.setattr(
+        ytb,
+        "YouTubeTranscriptApi",
+        type("FakeApi", (), {"get_transcript": staticmethod(_fake_get_transcript)}),
+    )
+
+    # -v → console log level INFO so the retry line reaches stdout
+    run_cli(tmp_path, "dummy", "-f", "text", "-n", "1", "-v")
+
+    # a file should have been produced after retries
+    assert list(tmp_path.glob("*.txt")), "no output after retries"
+
+    # We should have attempted exactly three calls (two 429s + final success)
+    assert calls["n"] == 3, "back-off logic did not retry the expected number of times"
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 2. Windows path-length safeguard
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def test_windows_path_shortening(monkeypatch, tmp_path: Path):
+    """Unit-test the helper directly; no need to touch pathlib.WindowsPath."""
+
+    long_title = "L" * 500
+    original   = tmp_path / f"[vid] {long_title}.txt"
+
+    # Make the helper think it's running on Windows **after** the Path exists
+    monkeypatch.setattr(ytb.os, "name", "nt", raising=False)
+
+    shortened = ytb._shorten_for_windows(original)
+    assert len(str(shortened)) <= 260, "path exceeds Windows MAX_PATH"
