@@ -1,0 +1,48 @@
+[project]
+name            = "site_downloader"
+version         = "0.0.1"
+description     = "Unified CLI to fetch pages, clean HTML, convert, and render PDFs/PNGs via Playwright."
+requires-python = ">=3.10"
+
+dependencies = [
+  "typer>=0.12", # CLI framework (includes rich & shellingham)
+  "playwright>=1.44",
+  "html2text>=2020.1.16",
+  "tqdm>=4.66",
+  "pydantic>=2.7",
+  "readability-lxml>=0.8",
+  "user-agents>=2.2",
+  "beautifulsoup4>=4.12",
+  "markdownify>=0.11",
+  "markitdown>=0.1.2",
+  "pytest-cov>=6.2.1",
+  "pytest-xdist>=3.7.0",
+  "aiofiles>=23.2.1",  # For async file operations in batch processing
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2",
+  "pytest-playwright>=0.5",
+  "ruff",
+  "black",
+  "pandocfilters; platform_system != 'Windows'",
+  "pytest-cov",                    # ➊ coverage
+  "pytest-xdist",                  # ➋ parallel test runs
+]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.scripts]
+sdl = "site_downloader.cli:app"      # `sdl --help`
+
+[build-system]
+requires = ["uv", "setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv.pip]
+all-extras = true

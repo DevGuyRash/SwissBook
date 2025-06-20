@@ -1,0 +1,169 @@
+/*
+ * Annoyance Hiding Stylesheet for Playwright (media: screen)
+ * -----------------------------------------------------------
+ * A forgiving stylesheet to hide common web annoyances during PDF rendering.
+ * Rules are designed to be specific to avoid breaking essential page layout.
+ * Each rule ends with `!important` to ensure it overrides site styling.
+ *
+ * Authored by AI Assistant, refined from user input. Last updated 2025-06-07.
+ */
+
+/* ========================================================================
+1. Cookie, GDPR, and Privacy Banners
+====================================================================== */
+[id*="cookie"], [id*="gdpr"], [id*="privacy"], [id*="consent"],
+[class*="cookie-"], [class*="gdpr-"], [class*="privacy-"], [class*="consent-"],
+[class*="banner"],
+[aria-label*="cookie"], [aria-label*="consent"], [aria-label*="privacy"],
+[aria-modal="true"][role="dialog"] {
+  display: none !important;
+}
+
+/* 1.a  Specific Frameworks & Services */
+#CybotCookiebotDialog,       /* Cookiebot */
+#usercentrics-root,          /* Usercentrics */
+#qc-cmp2-container,          /* Quantcast CMP */
+#cmp-container,              /* various CMPs */
+.eu-cookie-compliance,       /* Drupal */
+.truste_overlay, .truste_popframe, /* TrustArc */
+.cc-window, .cc-banner       /* Cookie Consent by Insites */ {
+  display: none !important;
+}
+
+/* ========================================================================
+  2. Promo, Newsletter, and Gated-Content Pop-ups
+  ====================================================================== */
+[class*="subscribe-"], [class*="subscription-"], [id*="newsletter"],
+[class*="modal"], [class*="popup"], [class*="pop-up"],
+[class*="paywall"], [class*="gate"],
+/* A general selector for fixed overlays with a very high z-index.
+  Still potentially risky, but safer than the original generic rule. */
+div[style*="position: fixed"][style*="z-index: 99"],
+/* Common paywall vendors */
+#piano-id, #spr-core, .meter-dialog {
+  display: none !important;
+}
+
+/* ========================================================================
+  3. Sticky Headers, Footers, and Banners
+  ====================================================================== */
+header[style*="position: fixed"], header[style*="position: sticky"],
+footer[style*="position: fixed"], footer[style*="position: sticky"],
+nav[style*="position: fixed"], nav[style*="position: sticky"],
+[class*="sticky-top"], [class*="fixed-top"],
+[class*="sticky-bottom"], [class*="fixed-bottom"],
+[class*="announcement-bar"], [class*="promo-bar"],
+/* Catch `<div>` elements acting as sticky headers */
+div[data-header-sticky], div[role="banner"][style*="position"] {
+  /* We use visibility instead of display to avoid layout shifts.
+    Element still occupies space, just isn't visible. */
+  visibility: hidden !important;
+}
+
+/* ========================================================================
+  4. Chat & Support Widgets
+  ====================================================================== */
+[id*="chat"], [id^="chattab"], [class*="chat-widget"],
+iframe[src*="intercom.io"], iframe[id*="intercom-frame"],
+iframe[src*="crisp.chat"],
+iframe[title*="chat"], iframe[aria-label*="chat"],
+div[id^="hubspot-messages"], div[id*="drift-widget-container"],
+#live-chat-widget {
+  display: none !important;
+}
+
+/* ========================================================================
+  5. Full-Page Backdrop / Dark-Mode Overlays
+  ====================================================================== */
+div[style*="position: fixed"][style*="top: 0px"][style*="left: 0px"][style*="width: 100%"],
+div[style*="backdrop-filter"], div[style*="filter: blur"],
+[class*="modal-backdrop"] {
+  opacity: 0 !important;
+  pointer-events: none !important; /* Prevents interaction if somehow visible */
+}
+
+/* ========================================================================
+  6. "Back to Top" & Floating Social Share Buttons
+  ====================================================================== */
+/* Classic back-to-top / scroll buttons */
+[class*="back-to-top"], [class*="scroll-top"], [class*="scrollup"],
+/* Floating social share clusters */
+[class*="social-buttons"], [class*="share-buttons"], [class*="floating-social"],
+[id*="share-floating"],
+/* Progress-circle style scroll indicators (e.g. <a id=\"progress-circle\">) */
+[id*="progress-circle"], [class*="progress-circle"], [id*="scroll-progress"], [class*="scroll-progress"],
+/* Anchors that jump to #top while explicitly fixed-position (low false-positive risk) */
+a[href*="#top"][style*="position: fixed"], a[href*="#top-of-content"][style*="position: fixed"] {
+  display: none !important;
+}
+
+/* ========================================================================
+  7. Advertisements (best-effort, carefully scoped)
+  ====================================================================== */
+[id^="ad-"], [id*="-ad-"][id], [id^="google_ads"],
+[class*=" ad-"], [class^="ad-"], [class*="advert"], [class*="google-ad"],
+ins.adsbygoogle, .adslot {
+  display: none !important;
+}
+
+/* ========================================================================
+  8. Floating / Sticky Video Players
+  ====================================================================== */
+div[class*="video"][style*="position: fixed"],
+div[class*="player"][style*="position: fixed"],
+iframe[src*="jwplayer"][style*="position: fixed"],
+[class*="sticky-video"] {
+    display: none !important;
+}
+
+/* ========================================================================
+  9. Push-Notification & App-Install Banners
+  ====================================================================== */
+[id*="push"], [class*="push-"],
+[id*="notification-bar"], [class*="notification-bar"],
+[id*="app-banner"], [class*="app-banner"],
+[class*="install-app"], [class*="smartbanner"],
+[aria-label*="app"] {
+  display: none !important;
+}
+
+/* ========================================================================
+  10. Survey & Feedback Widgets
+  ====================================================================== */
+[id*="survey"], [class*="survey-"], [id*="feedback"], [class*="feedback-"],
+iframe[src*="typeform"], iframe[src*="surveymonkey"],
+form[action*="typeform"], form[action*="surveymonkey"] {
+  display: none !important;
+}
+
+/* ========================================================================
+  11. Admin/Editor Toolbars (e.g., WordPress)
+  ====================================================================== */
+#wpadminbar, [class*="admin-bar"], [class*="editor-toolbar"],
+[id*="editor-toolbar"] {
+  display: none !important;
+}
+
+/* ========================================================================
+  12. AMP & Off-Canvas Sidebars (only when they are open/fixed)
+  ====================================================================== */
+amp-sidebar[open],
+[class*="offcanvas" i][style*="position: fixed"],
+[class*="off-canvas" i][style*="position: fixed"] {
+  display: none !important;
+}
+
+/* ========================================================================
+  13. Print Helper – Remove Unwanted Page Margins
+  ====================================================================== */
+@page {
+  margin: 12mm 8mm 12mm 8mm; /* Moderate margins for readability */
+}
+
+/* ========================================================================
+  14. Safety Overrides – Avoid Hiding Main Content Elements
+  ====================================================================== */
+main, article, section {
+  display: block !important; /* Ensure core semantic content stays visible */
+}
+   

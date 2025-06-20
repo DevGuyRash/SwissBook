@@ -22,7 +22,7 @@ import re
 # ---------------------------------------------------------------------------
 # ensure scripts/ is importable
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "src" / "yt_bulk_cc"))
 
 import yt_bulk_cc as ytb  # noqa: E402  (import after path tweak)
 
