@@ -56,32 +56,32 @@ python -m yt_bulk_cc.yt_bulk_cc --convert ./out -f srt -o ./out_srt
 
 #### Command-Line Options
 
-| Option | Argument | Description |
-| :--- | :--- | :--- |
-| **Core Options** | | |
-| `LINK` | _(url)_ | The positional argument for the video, playlist, or channel URL. |
-| `-o`, `--folder` | _(path)_ | Destination directory for output files. Default: `.` |
-| `-l`, `--language` | _(code)_ | Preferred language code (e.g., `en`, `es`). Can be repeated for fallback priority. |
-| `-f`, `--format` | _(name)_ | Output format: `json`, `srt`, `webvtt`, `text`, `pretty`. Default: `json`. |
-| `-n`, `--limit` | _(int)_ | Stop after processing N videos from a playlist or channel. |
-| `-j`, `--jobs` | _(int)_ | Number of concurrent transcript downloads. Default: `2`. |
-| **Output & Formatting** | | |
-| `-t`, `--timestamps` | | Adds `[hh:mm:ss.mmm]` timestamps to `text` format. |
-| `--no-seq-prefix` | | Disables the `00001-` numeric prefix on filenames. |
-| `--stats`<br>`--no-stats` | | Toggles the inclusion of statistics headers in output files. (Default: on) |
-| `-C`, `--concat` | _[basename]_ | Concatenate all results into a single file with an optional basename. |
-| `--split` | _(e.g. 10000c)_ | With `--concat`, splits the output into new files when a size threshold is met.<br>Units: `w` (words), `l` (lines), `c` (chars). |
-| **Network & Authentication** | | |
-| `-p`, `--proxy` | _(url)_ | A single proxy URL or a comma-separated list to rotate through. |
-| `-c`, `--cookie-json` | _(file)_ | Path to a cookies JSON file for accessing private/members-only content. |
-| `-s`, `--sleep` | _(int)_ | Seconds to wait between pagination requests when scraping. Default: `2`. |
-| **Utilities** | | |
-| `--convert` | _(path)_ | Converts existing JSON transcripts from a file or directory to the specified `-f` format. |
-| `--overwrite` | | Re-download and overwrite files even if they already exist. |
-| `-v`, `--verbose` | | Increase console log verbosity (`-v` for INFO, `-vv` for DEBUG). |
-| `-L`, `--log-file` | _(file)_ | Write a detailed run log to a specific file. |
-| `--no-log` | | Disable file logging entirely. |
-| `-F`, `--formats-help` | | Show examples of each output format and exit. |
+| Option                       | Argument        | Description                                                                                                                      |
+| :--------------------------- | :-------------- | :------------------------------------------------------------------------------------------------------------------------------- |
+| **Core Options**             |                 |                                                                                                                                  |
+| `LINK`                       | _(url)_         | The positional argument for the video, playlist, or channel URL.                                                                 |
+| `-o`, `--folder`             | _(path)_        | Destination directory for output files. Default: `.`                                                                             |
+| `-l`, `--language`           | _(code)_        | Preferred language code (e.g., `en`, `es`). Can be repeated for fallback priority.                                               |
+| `-f`, `--format`             | _(name)_        | Output format: `json`, `srt`, `webvtt`, `text`, `pretty`. Default: `json`.                                                       |
+| `-n`, `--limit`              | _(int)_         | Stop after processing N videos from a playlist or channel.                                                                       |
+| `-j`, `--jobs`               | _(int)_         | Number of concurrent transcript downloads. Default: `2`.                                                                         |
+| **Output & Formatting**      |                 |                                                                                                                                  |
+| `-t`, `--timestamps`         |                 | Adds `[hh:mm:ss.mmm]` timestamps to `text` format.                                                                               |
+| `--no-seq-prefix`            |                 | Disables the `00001-` numeric prefix on filenames.                                                                               |
+| `--stats`<br>`--no-stats`    |                 | Toggles the inclusion of statistics headers in output files. (Default: on)                                                       |
+| `-C`, `--concat`             | _[basename]_    | Concatenate all results into a single file with an optional basename.                                                            |
+| `--split`                    | _(e.g. 10000c)_ | With `--concat`, splits the output into new files when a size threshold is met.<br>Units: `w` (words), `l` (lines), `c` (chars). |
+| **Network & Authentication** |                 |                                                                                                                                  |
+| `-p`, `--proxy`              | _(url)_         | A single proxy URL or a comma-separated list to rotate through.                                                                  |
+| `-c`, `--cookie-json`        | _(file)_        | Path to a cookies JSON file for accessing private/members-only content.                                                          |
+| `-s`, `--sleep`              | _(int)_         | Seconds to wait between pagination requests when scraping. Default: `2`.                                                         |
+| **Utilities**                |                 |                                                                                                                                  |
+| `--convert`                  | _(path)_        | Converts existing JSON transcripts from a file or directory to the specified `-f` format.                                        |
+| `--overwrite`                |                 | Re-download and overwrite files even if they already exist.                                                                      |
+| `-v`, `--verbose`            |                 | Increase console log verbosity (`-v` for INFO, `-vv` for DEBUG).                                                                 |
+| `-L`, `--log-file`           | _(file)_        | Write a detailed run log to a specific file.                                                                                     |
+| `--no-log`                   |                 | Disable file logging entirely.                                                                                                   |
+| `-F`, `--formats-help`       |                 | Show examples of each output format and exit.                                                                                    |
 
 ---
 

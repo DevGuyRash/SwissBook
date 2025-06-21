@@ -1,16 +1,15 @@
-# Site Downloader (`sdl`)
+# Site Downloader (`sdl`)
 
 ```
-https://example.com  ─── ▶  example.pdf  (screen + print)
-                      ─── ▶  example.md
-                      ─── ▶  example.png
-                      ─── ▶  example.epub
+https://example.com  --- ▶  example.pdf  (screen + print)
+                      --- ▶  example.md
+                      --- ▶  example.png
+                      --- ▶  example.epub
 ```
-
 
 ## Installation
 
-> Requires Python ≥ 3.10. All commands below use **uv** but you can swap in plain `pip` if preferred.
+> Requires Python >= 3.10. All commands below use **uv** but you can swap in plain `pip` if preferred.
 
 ```bash
 # 1. create & activate an isolated env from the repo root
@@ -32,29 +31,29 @@ Fetch and convert a single URL:
 
 ```bash
 # Clean HTML (default)
-sdl grab https://example.com           # → out/example.com.html
+sdl grab https://example.com # → out/example.com.html
 
 # Markdown
-sdl grab https://example.com -f md     # → out/example.com.md
+sdl grab https://example.com -f md # → out/example.com.md
 
-# Dual PDF (screen & print) at 1.5× scale
+# Dual PDF (screen & print) at 1.5x scale
 sdl grab https://example.com -f pdf -q 1.5
 
-# Full‑page PNG (Firefox engine, dark mode)
+# Full-page PNG (Firefox engine, dark mode)
 sdl grab https://example.com -f png -e firefox --dark-mode
 ```
 
-Batch mode (auto‑detected when the first argument is a list file):
+Batch mode (auto-detected when the first argument is a list file):
 
 ```bash
-echo "https://example.com"  > urls.txt
-echo "https://python.org"  >> urls.txt
+echo "https://example.com" > urls.txt
+echo "https://python.org" >> urls.txt
 
-# generates out/example.com.md & out/python.org.md with 4‑way concurrency
+# generates out/example.com.md & out/python.org.md with 4-way concurrency
 sdl grab urls.txt -f md --jobs 4
 ```
 
-You can still call the explicit sub‑command if you prefer:
+You can still call the explicit sub-command if you prefer:
 
 ```bash
 sdl batch urls.txt -f pdf -j 8
@@ -64,21 +63,21 @@ sdl batch urls.txt -f pdf -j 8
 
 ## Feature matrix
 
-| Format | Source | Engine needed | Notes |
-|---|---|---|---|
-| `html` | remote / local | _(none)_ | raw readability extraction |
-| `md`, `txt` | remote / local | _(none)_ | converts with MarkItDown ⇒ fallback to html2text |
-| `docx`, `epub` | remote / local | _(none)_ | requires **pandoc** in `PATH` |
-| `pdf` | **remote** only | Playwright `chromium` | writes _screen_ + _print_ PDFs |
-| `png` | remote only | any Playwright engine | PNG screenshot, full page |
+| Format         | Source          | Engine needed         | Notes                                            |
+| -------------- | --------------- | --------------------- | ------------------------------------------------ |
+| `html`         | remote / local  | _(none)_              | raw readability extraction                       |
+| `md`, `txt`    | remote / local  | _(none)_              | converts with MarkItDown = fallback to html2text |
+| `docx`, `epub` | remote / local  | _(none)_              | requires **pandoc** in `PATH`                    |
+| `pdf`          | **remote** only | Playwright `chromium` | writes _screen_ + _print_ PDFs                   |
+| `png`          | remote only     | any Playwright engine | PNG screenshot, full page                        |
 
 Common CLI options:
 
 - `--proxy http://host:port`
-- `--headers '{"X‑Foo":"1"}'` (JSON)
-- `--selector "main article"` – override auto‑detected article node
+- `--headers '{"X-Foo":"1"}'` (JSON)
+- `--selector "main article"` - override auto-detected article node
 - `--viewport-width 1440`
-- `--quality 1.5` (PDF scale / device‑pixel‑ratio)
+- `--quality 1.5` (PDF scale / device-pixel-ratio)
 
 ---
 
@@ -96,7 +95,7 @@ The Playwright integration test (`-m e2e`) is skipped automatically when
 browsers are unavailable.
 
 - _Coding style_: **ruff** / **black**
-- _Type‑checking_: *optional* mypy (config in `pyproject.toml`)
+- _Type-checking_: *optional* mypy (config in `pyproject.toml`)
 
 ---
 

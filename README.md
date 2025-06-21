@@ -8,10 +8,10 @@ A grab-bag of command-line utilities written in Python. Everything lives in a **
 
 This repository currently contains the following standalone tools:
 
-| Tool | CLI | Description | Documentation |
+| Tool                | CLI             | Description                                                                                                                                   | Documentation                                                                  |
 | :------------------ | :-------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------- |
-| **Site Downloader** | `sdl` | A versatile web page downloader and converter. It fetches, cleans, and converts pages to PDF, PNG, Markdown, DOCX, and more using Playwright. | [**`packages/site_downloader/README.md`**](packages/site_downloader/README.md) |
-| **YouTube Bulk CC** | `yt_bulk_cc.py` | A script to bulk-download YouTube transcripts for single videos, playlists, or entire channels-no API key required. | See built-in help (`--help`) |
+| **Site Downloader** | `sdl`           | A versatile web page downloader and converter. It fetches, cleans, and converts pages to PDF, PNG, Markdown, DOCX, and more using Playwright. | [**`packages/site_downloader/README.md`**](packages/site_downloader/README.md) |
+| **YouTube Bulk CC** | `yt_bulk_cc.py` | A script to bulk-download YouTube transcripts for single videos, playlists, or entire channels-no API key required.                           | See built-in help (`--help`)                                                   |
 
 ---
 
