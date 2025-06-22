@@ -71,13 +71,34 @@ sdl batch urls.txt -f pdf -j 8
 | `pdf`          | **remote** only | Playwright `chromium` | writes _screen_ + _print_ PDFs                   |
 | `png`          | remote only     | any Playwright engine | PNG screenshot, full page                        |
 
-Common CLI options:
+## New in v0.2.0
 
-- `--proxy http://host:port`
-- `--headers '{"X-Foo":"1"}'` (JSON)
-- `--selector "main article"` - override auto-detected article node
-- `--viewport-width 1440`
-- `--quality 1.5` (PDF scale / device-pixel-ratio)
+- **User Agent Rotation**: Randomize user agents with browser/OS filtering
+- **Proxy Support**: Rotate through multiple proxies from a list or file
+- **Cookie Management**: Load cookies from JSON or perform interactive login
+- **Custom Styling**: Inject additional CSS for better readability
+
+## Common CLI options
+
+### Network & Identity
+
+- `--proxy http://host:port` - Use a single proxy
+- `--proxies "http://p1:port,http://p2:port"` - Rotate through multiple proxies (comma-separated)
+- `--proxy-file proxies.txt` - Load proxies from file (one per line)
+- `--ua-browser chrome` - Filter user agents by browser (chrome/firefox/safari/edge)
+- `--ua-os windows` - Filter user agents by OS (windows/linux/macos/android/ios)
+- `--cookies-json '{"name":"value"}'` - Pass cookies as JSON string
+- `--cookies-file cookies.json` - Load cookies from JSON file
+- `--login https://example.com/login` - Interactive login to capture cookies
+- `--headers '{"X-Foo":"1"}'` - Add custom HTTP headers (JSON)
+
+### Output & Styling
+
+- `--selector "main article"` - Override auto-detected article node
+- `--extra-css styles1.css,styles2.css` - Inject additional CSS files
+- `--dark-mode` - Enable dark color scheme
+- `--viewport-width 1440` - Set viewport width in pixels
+- `--quality 1.5` - PDF scale / device-pixel-ratio (default: 2.0)
 
 ---
 

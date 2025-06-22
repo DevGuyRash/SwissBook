@@ -15,6 +15,9 @@ dependencies = [
   "beautifulsoup4>=4.12",
   "markdownify>=0.11",
   "markitdown>=0.1.2",
+  # --- NEW: UA & header generators ---
+  "fake-useragent>=2.2",      # actively-maintained 2025 release
+  "fake-headers>=1.0",        # complements UA with believable headers
   "pytest-cov>=6.2.1",
   "pytest-xdist>=3.7.0",
   "aiofiles>=23.2.1",  # For async file operations in batch processing
@@ -29,6 +32,7 @@ dev = [
   "pandocfilters; platform_system != 'Windows'",
   "pytest-cov",                    # ➊ coverage
   "pytest-xdist",                  # ➋ parallel test runs
+  "hypothesis>=6.99",               # ➌ property-based testing
 ]
 
 [tool.setuptools]

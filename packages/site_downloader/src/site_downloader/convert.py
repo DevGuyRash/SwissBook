@@ -19,7 +19,7 @@ from site_downloader.constants import VALID_FORMATS
 from site_downloader.errors import PandocMissing
 
 
-# NOTE: pdf / png are *rendered*, not converted – still useful for CLI validation
+# NOTE: pdf / png are *rendered*, not converted - still useful for CLI validation
 def convert_html(
     html: str, fmt: Literal["html", "md", "txt", "docx", "epub"]
 ) -> str | bytes:

@@ -154,14 +154,14 @@ amp-sidebar[open],
 }
 
 /* ========================================================================
-  13. Print Helper – Remove Unwanted Page Margins
+  13. Print Helper - Remove Unwanted Page Margins
   ====================================================================== */
 @page {
   margin: 12mm 8mm 12mm 8mm; /* Moderate margins for readability */
 }
 
 /* ========================================================================
-  14. Safety Overrides – Avoid Hiding Main Content Elements
+  14. Safety Overrides - Avoid Hiding Main Content Elements
   ====================================================================== */
 main, article, section {
   display: block !important; /* Ensure core semantic content stays visible */

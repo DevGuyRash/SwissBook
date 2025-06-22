@@ -29,7 +29,7 @@ import argparse
 import asyncio
 import contextlib
 import datetime
-import os            # NEW – Windows pathname tweak
+import os            # NEW - Windows pathname tweak
 import inspect
 import json
 import logging
@@ -304,7 +304,7 @@ def _extract_cues(blob):
         for item in blob["items"]:
             cues.extend(_extract_cues(item)) # recurse one level
         return cues
-    return []                                # fallback – no cues
+    return []                                # fallback - no cues
 
 def convert_existing(
     src: str, dest_fmt: str, out_dir: Path, *, include_stats: bool = True
@@ -398,7 +398,7 @@ async def grab(
 
                 # ───────────────────────── DEBUG A ─────────────────────────
                 logging.debug(
-                    "grab[%s] About to call .get_transcript – "
+                    "grab[%s] About to call .get_transcript - "
                     "api=%r  sig=%s  kwargs=%s  NoTranscriptFound-id=%s",
                     vid,
                     YouTubeTranscriptApi,
@@ -430,7 +430,7 @@ async def grab(
                     if include_stats:
                         for _ in range(3):                          # converges fast
                             # Make the measurement on **exactly** the same
-                            # text that will be written to disk – including
+                            # text that will be written to disk - including
                             # the final newline that json.dumps omits.
                             tmp = json.dumps(payload, indent=2,
                                             ensure_ascii=False)
@@ -1014,7 +1014,7 @@ async def main() -> None:
                 try:
                     src = next(out_dir.glob(f"*[{vid}]*.json"))
                 except StopIteration:
-                    logging.warning("File for %s not found – prefix off?", vid)
+                    logging.warning("File for %s not found - prefix off?", vid)
                     continue
 
                 try:
@@ -1084,7 +1084,7 @@ async def main() -> None:
                 try:
                     src = next(out_dir.glob(f"*[{vid}]*.{EXT[args.format]}"))
                 except StopIteration:
-                    logging.warning("File for %s not found – prefix off?", vid)
+                    logging.warning("File for %s not found - prefix off?", vid)
                     continue
                 try:
                     txt = src.read_text(encoding="utf-8")

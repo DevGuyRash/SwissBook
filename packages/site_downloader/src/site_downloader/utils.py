@@ -19,8 +19,11 @@ def sanitize_url_for_filename(url: str) -> str:
     → `a_b_q_v`
     """
     url = re.sub(r"^https?://", "", url)
-    url = re.sub(r"[/?=&#:]+", "_", url)
-    slug = re.sub(r"_{2,}", "_", url).strip("_")
+    # also replace Windows back‑slashes so the function is platform‑agnostic
+    url = re.sub(r"[/?=&#:\\:]+", "_", url)
+    # compress multiple consecutive underscores to one
+    slug = re.sub(r"_{2,}", "_", url)        # collapse multiple "__" → "_"
+    # ✨  keep leading/trailing underscores so the function is idempotent
     normalized = unicodedata.normalize("NFKD", slug).encode("ascii", "ignore").decode()
     return normalized or "index"
 
@@ -59,19 +62,28 @@ def sec_ch_headers(user_agent: str) -> Dict[str, str]:
     # Brands
     major_ver: str | None = None
     if "edg/" in ua:
-        major_ver = re.search(r"edg/(\d+)", ua).group(1)
+        m = re.search(r"edg/(\d+)", ua)
+        major_ver = m.group(1) if m else "99"
         headers["Sec-CH-UA"] = (
             f'"Not_A Brand";v="8", "Chromium";v="{major_ver}", '
             f'"Microsoft Edge";v="{major_ver}"'
         )
     elif "chrome/" in ua:
-        major_ver = re.search(r"chrome/(\d+)", ua).group(1)
+        m = re.search(r"chrome/(\d+)", ua)
+        major_ver = m.group(1) if m else "99"
         headers["Sec-CH-UA"] = (
             f'"Not_A Brand";v="8", "Chromium";v="{major_ver}", '
             f'"Google Chrome";v="{major_ver}"'
         )
     elif "firefox/" in ua:
-        major_ver = re.search(r"firefox/(\d+)", ua).group(1)
+        m = re.search(r"firefox/(\d+)", ua)
+        major_ver = m.group(1) if m else "99"
         headers["Sec-CH-UA"] = f'"Firefox";v="{major_ver}"'
+
+    # --- Fallback: always provide the header so downstream code/tests that
+    # require the triad {UA‑Platform, UA‑Mobile, UA} never break even when
+    # the UA string is too exotic or extremely short (e.g. "0").
+    if "Sec-CH-UA" not in headers:
+        headers["Sec-CH-UA"] = '"Not_A Brand";v="99"'
 
     return headers

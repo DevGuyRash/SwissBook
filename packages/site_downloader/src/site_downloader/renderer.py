@@ -20,6 +20,11 @@ def render_page(
     proxy: Optional[str] = None,
     viewport_width: int = 1280,
     headers_json: Optional[str] = None,
+    # New parameters
+    cookies: Optional[list[dict]] = None,
+    ua_browser: Optional[str] = None,
+    ua_os: Optional[str] = None,
+    extra_css: Optional[list[str]] = None,
 ) -> None:
     """Render a webpage to PDF or PNG.
     
@@ -49,6 +54,10 @@ def render_page(
             proxy=proxy,
             viewport_width=viewport_width,
             extra_headers=extra,
+            cookies=cookies,
+            ua_browser=ua_browser,
+            ua_os=ua_os,
+            extra_css=extra_css,
         ) as (_, _, page):
             page.goto(url, wait_until="networkidle", timeout=90_000)
 

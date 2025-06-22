@@ -23,12 +23,18 @@ new_page = _dynamic_new_page
 
 
 def _auto_scroll(page: Page, *, max_scrolls: int = 10, pause: float = 0.5) -> None:
-    """Auto-scroll the page to trigger lazy-loaded content.
+    """
+    Auto-scroll the page to trigger lazy-loaded content.
+    
+    This function scrolls to the bottom of the page in increments, waiting between
+    each scroll to allow dynamic content to load. It stops when either:
+    - The page stops growing in height, or
+    - The maximum number of scroll attempts is reached.
     
     Args:
-        page: Playwright page object
-        max_scrolls: Maximum number of scroll attempts
-        pause: Seconds to wait between scrolls
+        page: Playwright page object to scroll
+        max_scrolls: Maximum number of scroll attempts before giving up
+        pause: Seconds to wait between scrolls to allow content to load
     """
     prev = -1
     for _ in range(max_scrolls):
@@ -56,6 +62,11 @@ def fetch_clean_html(
     headers_json: str | None = None,
     dark_mode: bool = False,
     viewport_width: int = 1280,
+    # New parameters
+    cookies: Optional[list[dict]] = None,
+    ua_browser: Optional[str] = None,
+    ua_os: Optional[str] = None,
+    extra_css: Optional[list[str]] = None,
 ) -> str:
     """Fetch and clean HTML from a URL.
     
@@ -81,6 +92,10 @@ def fetch_clean_html(
         dark_mode=dark_mode,
         viewport_width=viewport_width,
         extra_headers=extra,
+        cookies=cookies,
+        ua_browser=ua_browser,
+        ua_os=ua_os,
+        extra_css=extra_css,
     ) as (_, ctx, page):
         # Unit‑tests sometimes inject a stub where ``page`` is ``None``.
         if page is None or not hasattr(page, "goto"):

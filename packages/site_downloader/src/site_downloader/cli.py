@@ -28,7 +28,7 @@ from site_downloader.constants import (
 app = typer.Typer(add_completion=False, help="Site Downloader CLI", no_args_is_help=True)
 
 # --------------------------------------------------------------------------- #
-# Helper – unwrap Typer's sentinel objects when functions are invoked
+# Helper - unwrap Typer's sentinel objects when functions are invoked
 # **directly** from Python (e.g. unit‑tests) instead of through the CLI
 # parser.  After this, business‑logic never has to special‑case them again.
 # --------------------------------------------------------------------------- #
@@ -39,7 +39,7 @@ def _unwrap(value: Any) -> Any:                       # pragma: no cover
 
 
 # --------------------------------------------------------------------------- #
-# "grab" – single front-door (full parity with legacy Bash/JS tools)
+# "grab" - single front-door (full parity with legacy Bash/JS tools)
 # --------------------------------------------------------------------------- #
 @app.command()
 def grab(
@@ -49,8 +49,27 @@ def grab(
     # browser / network
     engine: str = Opt("chromium", "--engine", "-e", help="chromium | firefox | webkit"),
     proxy: Optional[str] = Opt(None, "--proxy", help="HTTP proxy, e.g. http://host:3128"),
+    proxies: Optional[str] = Opt(None, "--proxies", help="Comma-separated proxy list"),
+    proxy_file: Optional[pathlib.Path] = Opt(
+        None, "--proxy-file", help="File containing proxies (1/line)"
+    ),
     headers: Optional[str] = Opt(None, "--headers", help="Extra HTTP headers as JSON string"),
     dark_mode: bool = Opt(False, "--dark-mode", help="prefers-color-scheme: dark"),
+    # --- NEW ‑ UA filters -------------------------------------------------- #
+    ua_browser: Optional[str] = Opt(
+        None, "--ua-browser", help="Prefer UA from this browser family"
+    ),
+    ua_os: Optional[str] = Opt(None, "--ua-os", help="windows/linux/macos/android/ios"),
+    # --- NEW ‑ cookies / login -------------------------------------------- #
+    cookies_json: Optional[str] = Opt(None, "--cookies-json", help="Cookies JSON str"),
+    cookies_file: Optional[pathlib.Path] = Opt(None, "--cookies-file", help="cookies.json"),
+    login: Optional[str] = Opt(None, "--login", help="Interactively log in at URL"),
+    # --- NEW ‑ extra CSS --------------------------------------------------- #
+    extra_css: Optional[str] = Opt(
+        None,
+        "--extra-css",
+        help="Comma-separated list of additional CSS files injected on load",
+    ),
     viewport_width: int = Opt(
         DEFAULT_VIEWPORT, "--viewport-width", help="Viewport width px"
     ),
@@ -69,7 +88,7 @@ def grab(
     max_scrolls: int = Opt(10, "--max-scrolls", help="Auto-scroll iterations"),
 ) -> None:
     """
-    Unified command – determines workflow solely by **--format**.
+    Unified command - determines workflow solely by **--format**.
 
     • html / md / txt / docx / epub → article extraction & conversion  
     • pdf / png                     → full-page capture (screen + print for PDF)  
@@ -86,6 +105,9 @@ def grab(
 
     engine         = _unwrap(engine)
     proxy          = _unwrap(proxy)
+    proxies        = _unwrap(proxies)
+    _proxy_file    = _unwrap(proxy_file)
+    proxy_file     = pathlib.Path(_proxy_file) if _proxy_file is not None else None
     headers        = _unwrap(headers)
     dark_mode      = bool(_unwrap(dark_mode))
     viewport_width = int(_unwrap(viewport_width))
@@ -93,7 +115,37 @@ def grab(
     selector       = _unwrap(selector)
     no_scroll      = bool(_unwrap(no_scroll))
     max_scrolls    = int(_unwrap(max_scrolls))
+    ua_browser     = _unwrap(ua_browser)
+    ua_os          = _unwrap(ua_os)
+    cookies_json   = _unwrap(cookies_json)
+    _cookies_file  = _unwrap(cookies_file)
+    cookies_file   = pathlib.Path(_cookies_file) if _cookies_file is not None else None
+    login          = _unwrap(login)
+
+    # ── handle OptionInfo sentinel correctly ──────────────────────────────
+    _raw_css       = _unwrap(extra_css)          # None | str
+    extra_css      = (
+        [p.strip() for p in _raw_css.split(",") if p.strip()]
+        if _raw_css
+        else None
+    )
     
+    # ---------- proxy pool initialisation -------------------------------- #
+    from site_downloader.proxy import pool as proxy_pool
+
+    _proxy_cycle = proxy_pool(proxy, proxies, proxy_file)
+
+    # ---------- cookie handling ------------------------------------------ #
+    from site_downloader import session as _sess
+
+    jar: list[dict] | None = None
+    if login:
+        jar = _sess.interactive_login(login, pathlib.Path("cookies.json"))
+    elif cookies_json:
+        jar = json.loads(cookies_json)
+    elif cookies_file:
+        jar = _sess.load_cookie_file(cookies_file)
+
     # Ensure headers reach the fetcher even when grab() is called directly
     headers_json = headers if isinstance(headers, str) else None
 
@@ -131,9 +183,13 @@ def grab(
             engine=engine,
             scale=quality,
             dark_mode=dark_mode,
-            proxy=proxy,
+            proxy=next(_proxy_cycle),
             viewport_width=viewport_width,
             headers_json=headers,
+            cookies=jar,
+            ua_browser=ua_browser,
+            ua_os=ua_os,
+            extra_css=extra_css,
         )
         typer.echo(f"✅  Saved {out}")
         return
@@ -150,9 +206,13 @@ def grab(
             engine=engine,
             auto_scroll=not no_scroll,
             max_scrolls=max_scrolls,
-            proxy=proxy,
+            proxy=next(_proxy_cycle),
             headers_json=headers_json,  # Use the processed headers_json
             dark_mode=dark_mode,
+            cookies=jar,
+            ua_browser=ua_browser,
+            ua_os=ua_os,
+            extra_css=extra_css,
             viewport_width=viewport_width,
         )
 
@@ -165,7 +225,7 @@ def grab(
 
 
 # --------------------------------------------------------------------------- #
-# Legacy commands – keep for back-compat but hide from `--help`
+# Legacy commands - keep for back-compat but hide from `--help`
 # --------------------------------------------------------------------------- #
 @app.callback()
 def _version(
@@ -210,6 +270,22 @@ def batch(
     file: pathlib.Path = Arg(..., help="Text file of URLs"),
     fmt: str = Opt("pdf", "--format", "-f", help="Output format"),
     jobs: int = Opt(4, "--jobs", "-j", help="Concurrency"),
+    # Forward proxy options
+    proxy: Optional[str] = Opt(None, "--proxy", help="HTTP proxy, e.g. http://host:3128"),
+    proxies: Optional[str] = Opt(None, "--proxies", help="Comma-separated proxy list"),
+    proxy_file: Optional[pathlib.Path] = Opt(
+        None, "--proxy-file", help="File containing proxies (1/line)"
+    ),
+    # Forward other options
+    ua_browser: Optional[str] = Opt(None, "--ua-browser", help="Prefer UA from this browser family"),
+    ua_os: Optional[str] = Opt(None, "--ua-os", help="windows/linux/macos/android/ios"),
+    cookies_json: Optional[str] = Opt(None, "--cookies-json", help="Cookies JSON str"),
+    cookies_file: Optional[pathlib.Path] = Opt(None, "--cookies-file", help="cookies.json"),
+    extra_css: Optional[str] = Opt(
+        None,
+        "--extra-css",
+        help="Comma-separated list of additional CSS files injected on load",
+    ),
 ) -> None:
     """Process many URLs in **parallel** using the **grab** logic."""
     # Allow the function to be called directly (unit‑tests) *or* via the CLI.
@@ -234,7 +310,9 @@ def batch(
             _plain(fmt),                # positional 2
             out=out_path,               # everything else explicitly, *plain*
             engine=_plain("chromium"),
-            proxy=_plain(None),
+            proxy=_plain(proxy),
+            proxies=_plain(proxies),
+            proxy_file=_plain(proxy_file),
             headers=_plain(None),
             dark_mode=_plain(False),
             viewport_width=_plain(1280),
@@ -242,6 +320,11 @@ def batch(
             selector=_plain(None),
             no_scroll=_plain(False),
             max_scrolls=_plain(10),
+            ua_browser=_plain(ua_browser),
+            ua_os=_plain(ua_os),
+            cookies_json=_plain(cookies_json),
+            cookies_file=_plain(cookies_file),
+            extra_css=_plain(extra_css),
         )
 
     # Run with limited concurrency
