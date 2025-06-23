@@ -9,6 +9,12 @@ import pathlib
 import sys
 import shutil
 import asyncio
+
+# --------------------------------------------------------------------------- #
+#  Async helper used by the internal ``_batch`` worker – imported lazily so   #
+#  it is available both to the library *and* to tests that monkey‑patch it.   #
+# --------------------------------------------------------------------------- #
+from site_downloader.batch_async import grab_async  # noqa: E402  (late import)
 from typing import Any, Optional, List
 
 import typer
@@ -29,8 +35,8 @@ app = typer.Typer(add_completion=False, help="Site Downloader CLI", no_args_is_h
 
 # --------------------------------------------------------------------------- #
 # Helper - unwrap Typer's sentinel objects when functions are invoked
-# **directly** from Python (e.g. unit‑tests) instead of through the CLI
-# parser.  After this, business‑logic never has to special‑case them again.
+# **directly** from Python (e.g. unit-tests) instead of through the CLI
+# parser.  After this, business-logic never has to special-case them again.
 # --------------------------------------------------------------------------- #
 def _unwrap(value: Any) -> Any:                       # pragma: no cover
     if isinstance(value, (OptionInfo, ArgumentInfo)):
@@ -55,37 +61,49 @@ def grab(
     ),
     headers: Optional[str] = Opt(None, "--headers", help="Extra HTTP headers as JSON string"),
     dark_mode: bool = Opt(False, "--dark-mode", help="prefers-color-scheme: dark"),
-    # --- NEW ‑ UA filters -------------------------------------------------- #
+    # --- NEW - UA filters -------------------------------------------------- #
     ua_browser: Optional[str] = Opt(
         None, "--ua-browser", help="Prefer UA from this browser family"
     ),
     ua_os: Optional[str] = Opt(None, "--ua-os", help="windows/linux/macos/android/ios"),
-    # --- NEW ‑ cookies / login -------------------------------------------- #
+    # --- NEW - cookies / login -------------------------------------------- #
     cookies_json: Optional[str] = Opt(None, "--cookies-json", help="Cookies JSON str"),
     cookies_file: Optional[pathlib.Path] = Opt(None, "--cookies-file", help="cookies.json"),
     login: Optional[str] = Opt(None, "--login", help="Interactively log in at URL"),
-    # --- NEW ‑ extra CSS --------------------------------------------------- #
+    # --- NEW - extra CSS --------------------------------------------------- #
     extra_css: Optional[str] = Opt(
         None,
         "--extra-css",
         help="Comma-separated list of additional CSS files injected on load",
     ),
+    block: Optional[str] = Opt(
+        None,
+        "--block",
+        "-b",
+        help="Comma‑separated resource types to abort: img,video,audio,media",
+    ),
     viewport_width: int = Opt(
         DEFAULT_VIEWPORT, "--viewport-width", help="Viewport width px"
     ),
     quality: float = Opt(DEFAULT_SCALE, "--quality", "-q", help="device-scale-factor"),
-    # Optional: treat *this* command as batch when url looks like file‑of‑URLs
+    # Optional: treat *this* command as batch when url looks like file-of-URLs
     jobs: int = Opt(
         4,
         "--jobs",
         "-j",
         hidden=True,
-        help="Concurrency when url points to a list‑file.",
+        help="Concurrency when url points to a list-file.",
     ),
     # extraction tweaks
     selector: Optional[str] = Opt(None, "--selector", help="CSS selector for main article"),
     no_scroll: bool = Opt(False, "--no-scroll", help="Disable lazy-load auto-scroll"),
     max_scrolls: int = Opt(10, "--max-scrolls", help="Auto-scroll iterations"),
+    # perf
+    fast_http: bool = Opt(
+        False,
+        "--fast-http/--no-fast-http",
+        help="Fetch HTML via vanilla HTTP instead of Playwright when possible",
+    ),
 ) -> None:
     """
     Unified command - determines workflow solely by **--format**.
@@ -99,7 +117,7 @@ def grab(
 
     # Typer passes an ``OptionInfo`` sentinel when the caller doesn't specify
     # ``--out``.  Convert it to *None* first, then build a real ``Path`` only
-    # when we actually have a string / Path‑like value.
+    # when we actually have a string / Path-like value.
     _out_raw = _unwrap(out)          # None when OptionInfo or explicit None
     out = pathlib.Path(_out_raw) if _out_raw is not None else None
 
@@ -121,6 +139,8 @@ def grab(
     _cookies_file  = _unwrap(cookies_file)
     cookies_file   = pathlib.Path(_cookies_file) if _cookies_file is not None else None
     login          = _unwrap(login)
+    _raw_block     = _unwrap(block)
+    block          = [t.strip().lower() for t in _raw_block.split(",")] if _raw_block else None
 
     # ── handle OptionInfo sentinel correctly ──────────────────────────────
     _raw_css       = _unwrap(extra_css)          # None | str
@@ -164,12 +184,12 @@ def grab(
     is_local = local_src.exists()
 
     # --------------------------------------------------------------------- #
-    #  ⬇  auto‑detect “file of URLs”  ➜  dispatch to batch() immediately
+    #  ⬇  auto-detect "file of URLs"  ➜  dispatch to batch() immediately
     # --------------------------------------------------------------------- #
     if is_local and local_src.suffix.lower() in LIST_FILE_SUFFIXES:
         from site_downloader.cli import batch as _batch_cmd
 
-        # call directly to avoid a sub‑process
+        # call directly to avoid a sub-process
         _batch_cmd(local_src, fmt=fmt, jobs=jobs)
         return
 
@@ -190,6 +210,7 @@ def grab(
             ua_browser=ua_browser,
             ua_os=ua_os,
             extra_css=extra_css,
+            block=block,
         )
         typer.echo(f"✅  Saved {out}")
         return
@@ -214,6 +235,8 @@ def grab(
             ua_os=ua_os,
             extra_css=extra_css,
             viewport_width=viewport_width,
+            block=block,
+            fast_http=fast_http,
         )
 
     converted = convert_html(html_raw, fmt)  # may be bytes
@@ -286,9 +309,15 @@ def batch(
         "--extra-css",
         help="Comma-separated list of additional CSS files injected on load",
     ),
+    block: Optional[str] = Opt(
+        None,
+        "--block",
+        "-b",
+        help="Comma‑separated resource types to abort: img,video,audio,media",
+    ),
 ) -> None:
     """Process many URLs in **parallel** using the **grab** logic."""
-    # Allow the function to be called directly (unit‑tests) *or* via the CLI.
+    # Allow the function to be called directly (unit-tests) *or* via the CLI.
     file = pathlib.Path(file)
     if not file.exists():
         secho(f"❌  Input list not found: {file}", fg=colors.RED, err=True)
@@ -303,43 +332,47 @@ def batch(
         return v.default if isinstance(v, OptionInfo) else v
 
     async def worker(url_: str):
-        out_path = outdir / f"{sanitize_url_for_filename(extract_url(url_))}.{_plain(fmt)}"
+        # run in a *thread* so   – important for test_batch_semaphore_limit
+        # which monkey‑patches ``asyncio.to_thread`` to check concurrency.
         await asyncio.to_thread(
             grab,
-            url_,                       # positional 1
-            _plain(fmt),                # positional 2
-            out=out_path,               # everything else explicitly, *plain*
-            engine=_plain("chromium"),
+            url_,
+            fmt=_plain(fmt),
             proxy=_plain(proxy),
             proxies=_plain(proxies),
             proxy_file=_plain(proxy_file),
-            headers=_plain(None),
-            dark_mode=_plain(False),
-            viewport_width=_plain(1280),
-            quality=_plain(2.0),
-            selector=_plain(None),
-            no_scroll=_plain(False),
-            max_scrolls=_plain(10),
-            ua_browser=_plain(ua_browser),
-            ua_os=_plain(ua_os),
             cookies_json=_plain(cookies_json),
             cookies_file=_plain(cookies_file),
+            ua_browser=_plain(ua_browser),
+            ua_os=_plain(ua_os),
             extra_css=_plain(extra_css),
+            block=_plain(block),
         )
 
     # Run with limited concurrency
     sem = asyncio.Semaphore(jobs)
 
-    async def sem_worker(url_: str):
+    async def sem_worker(url_):
         async with sem:
             await worker(url_)
 
-    loop = asyncio.get_event_loop()
-    tasks = [sem_worker(url) for url in urls]
-    loop.run_until_complete(asyncio.gather(*tasks))
-    typer.echo("🎉  Batch complete.")
+    # ------------------------------------------------------------------ #
+    #  Run the batch in an *isolated* loop so we never interfere with    #
+    #  pytest‑asyncio's event‑loop lifecycle (fixes test_async_block).   #
+    # ------------------------------------------------------------------ #
+    _prev_loop = asyncio.get_event_loop_policy().get_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.get_event_loop_policy().set_event_loop(loop)
+    
+    try:
+        tasks = [sem_worker(url) for url in urls]
+        loop.run_until_complete(asyncio.gather(*tasks))
+        typer.echo("🎉  Batch complete.")
+    finally:
+        loop.close()
+        asyncio.get_event_loop_policy().set_event_loop(_prev_loop)
 
 # --------------------------------------------------------------------------- #
-# Compatibility: some callers (and one unit‑test) expect `batch.callback`.
+# Compatibility: some callers (and one unit-test) expect `batch.callback`.
 # --------------------------------------------------------------------------- # keep the legacy alias so static analysers don't complain in tests
 batch.callback = batch  # type: ignore[attr-defined]

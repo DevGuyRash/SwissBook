@@ -1,8 +1,8 @@
 """
-CLI‐level tests.  For happy‑path text formats we still spawn the
-`sdl` console‑script via ``subprocess`` (matches real user flows),
-but for PDF / PNG we execute the CLI **in‑process** so that test
-monkey‑patches (which stub Playwright) take effect.
+CLI‐level tests.  For happy-path text formats we still spawn the
+`sdl` console-script via ``subprocess`` (matches real user flows),
+but for PDF / PNG we execute the CLI **in-process** so that test
+monkey-patches (which stub Playwright) take effect.
 """
 
 import json
@@ -20,7 +20,7 @@ _runner = CliRunner()
 
 
 def _run_subprocess(*args, **kw):
-    """Spawn the real console‑script (used by text‑format tests)."""
+    """Spawn the real console-script (used by text-format tests)."""
 
     return subprocess.run(
         [BIN, *args], check=True, capture_output=True, text=True, **kw
@@ -68,14 +68,14 @@ def test_extra_headers_passthrough(monkeypatch):
             def __exit__(self, *args): pass
         return Dummy()
 
-    # Patch both the low‑level helper *and* the dynamic alias that ``fetcher``
-    # re‑exports so the stub is honoured no matter which symbol the code
-    # resolves at run‑time.
+    # Patch both the low-level helper *and* the dynamic alias that ``fetcher``
+    # re-exports so the stub is honoured no matter which symbol the code
+    # resolves at run-time.
     monkeypatch.setattr("site_downloader.browser.new_page", _fake_new_page)
     monkeypatch.setattr("site_downloader.fetcher.new_page", _fake_new_page)
 
     hdrs = json.dumps({"X-Test": "1"})
-    # Call the CLI function **directly** so the monkey‑patch is visible in‑proc
+    # Call the CLI function **directly** so the monkey-patch is visible in-proc
     # (a subprocess would import the modules afresh and miss the patch).
     from site_downloader.cli import grab
 

@@ -10,7 +10,7 @@ if importlib.util.find_spec("playwright") is None:
 from site_downloader.fetcher import fetch_clean_html
 
 def _stub_new_page(*_, **__):
-    """Return a context‑manager yielding a dummy Playwright page."""
+    """Return a context-manager yielding a dummy Playwright page."""
 
     class _Page:
         def goto(self, *a, **kw):
@@ -56,7 +56,7 @@ import site_downloader.fetcher as _fetcher
 
 def _patch(monkeypatch):
     """
-    Patch **every** public entry‑point that could lead to Playwright:
+    Patch **every** public entry-point that could lead to Playwright:
 
     * site_downloader.renderer.new_page   - used by render_page()
     * site_downloader.browser.new_page    - root implementation

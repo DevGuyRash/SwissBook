@@ -1,8 +1,8 @@
-"""Domain‑specific exceptions."""
+"""Domain-specific exceptions."""
 
 
 class SiteDownloaderError(Exception):
-    """Base class for all site‑downloader errors."""
+    """Base class for all site-downloader errors."""
 
 
 class InvalidURL(SiteDownloaderError):

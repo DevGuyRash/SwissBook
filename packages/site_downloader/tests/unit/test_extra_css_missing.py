@@ -1,5 +1,5 @@
 """
-Passing a non‑existent --extra-css file should raise FileNotFoundError
+Passing a non-existent --extra-css file should raise FileNotFoundError
 early, before any Playwright work is attempted.
 """
 

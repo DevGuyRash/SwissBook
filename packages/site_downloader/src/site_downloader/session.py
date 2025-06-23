@@ -25,11 +25,11 @@ def interactive_login(url: str, out_path: pathlib.Path) -> list[dict]:
     # ── tolerant bootstrap: works with real Playwright **and** simple MagicMocks
     _pm = sync_playwright()
     if hasattr(_pm, "chromium"):
-        # already a Playwright object (unit‑tests)
+        # already a Playwright object (unit-tests)
         pw = _pm
         _stop = getattr(pw, "stop", lambda: None)
     else:
-        # context‑manager path (real runtime)
+        # context-manager path (real runtime)
         pw = _pm.__enter__()
         _stop = lambda: _pm.__exit__(None, None, None)
 

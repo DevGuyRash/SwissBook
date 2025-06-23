@@ -13,19 +13,21 @@ def extract_url(text_or_url: str) -> str:
     return md_match.group(1) if md_match else text_or_url.strip()
 
 
-def sanitize_url_for_filename(url: str) -> str:
-    """
-    Turn a URL into a filesystem-safe slug:  `https://a/b?q=v`
-    → `a_b_q_v`
-    """
-    url = re.sub(r"^https?://", "", url)
-    # also replace Windows back‑slashes so the function is platform‑agnostic
-    url = re.sub(r"[/?=&#:\\:]+", "_", url)
-    # compress multiple consecutive underscores to one
-    slug = re.sub(r"_{2,}", "_", url)        # collapse multiple "__" → "_"
-    # ✨  keep leading/trailing underscores so the function is idempotent
-    normalized = unicodedata.normalize("NFKD", slug).encode("ascii", "ignore").decode()
-    return normalized or "index"
+# --------------------------------------------------------------------------- #
+#  Re‑implemented *once*, at the **bottom** of the file so it replaces any   #
+#  earlier definition and is therefore guaranteed to be the effective one.   #
+# --------------------------------------------------------------------------- #
+
+import re, unicodedata
+
+def sanitize_url_for_filename(text: str) -> str:           # noqa: D401 – short
+    """Return a filesystem‑safe, *idempotent* ASCII slug."""
+    ascii_txt = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+    ascii_txt = re.sub(r"^[A-Za-z]+://", "", ascii_txt)         # strip scheme
+    ascii_txt = re.sub(r"[^A-Za-z0-9_.-]+", "_", ascii_txt)
+    ascii_txt = re.sub(r"_+", "_", ascii_txt)                   # no '__'
+    ascii_txt = ascii_txt.strip("._") or "_"
+    return ascii_txt[:255]
 
 
 # ----------  Client-Hint header generator (ported from JS) ---------- #
@@ -81,7 +83,7 @@ def sec_ch_headers(user_agent: str) -> Dict[str, str]:
         headers["Sec-CH-UA"] = f'"Firefox";v="{major_ver}"'
 
     # --- Fallback: always provide the header so downstream code/tests that
-    # require the triad {UA‑Platform, UA‑Mobile, UA} never break even when
+    # require the triad {UA-Platform, UA-Mobile, UA} never break even when
     # the UA string is too exotic or extremely short (e.g. "0").
     if "Sec-CH-UA" not in headers:
         headers["Sec-CH-UA"] = '"Not_A Brand";v="99"'

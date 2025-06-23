@@ -3,7 +3,7 @@ from site_downloader.fetcher import _auto_scroll
 
 class _DummyPage:
     """
-    Fake Playwright page for auto‑scroll testing.
+    Fake Playwright page for auto-scroll testing.
 
     • We *only* consume one number per read of ``document.body.scrollHeight``.  
     • Calls that merely *scroll* the page must not consume the list.

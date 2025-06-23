@@ -1,11 +1,11 @@
 """
-Property‑based fuzzing for utils.sanitize_url_for_filename.
+Property-based fuzzing for utils.sanitize_url_for_filename.
 
 Ensures the function never:
 * raises,
 * produces path separators,
-* emits non‑ASCII,
-* returns an empty or >255‑char string.
+* emits non-ASCII,
+* returns an empty or >255-char string.
 """
 import unicodedata
 
@@ -28,10 +28,10 @@ def test_slug_invariants(random_text: str) -> None:
     assert "/" not in slug and "\\" not in slug, "no path separators allowed"
     assert all(ord(ch) < 128 for ch in slug), "result should be ASCII"
 
-    # double‑normalisation must be idempotent
+    # double-normalisation must be idempotent
     assert sanitize_url_for_filename(slug) == slug
     # stylistic: no repeated underscores
     assert "__" not in slug
 
-    # extra sanity: Unicode normalisation round‑trip is stable
+    # extra sanity: Unicode normalisation round-trip is stable
     assert unicodedata.normalize("NFKD", slug) == slug

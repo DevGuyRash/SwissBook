@@ -21,6 +21,7 @@ dependencies = [
   "pytest-cov>=6.2.1",
   "pytest-xdist>=3.7.0",
   "aiofiles>=23.2.1",  # For async file operations in batch processing
+  "pytest-asyncio>=0.23",
 ]
 
 [project.optional-dependencies]
@@ -50,3 +51,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.uv.pip]
 all-extras = true
+
+[tool.uv.sources]
+site_downloader = { path = "src/site_downloader", editable = true }

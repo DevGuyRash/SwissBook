@@ -1,4 +1,4 @@
-"""Renderer fallback: non‑Chromium engine → PNG screenshot only."""
+"""Renderer fallback: non-Chromium engine → PNG screenshot only."""
 
 import pathlib
 

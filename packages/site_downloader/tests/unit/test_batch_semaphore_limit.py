@@ -25,7 +25,7 @@ def test_batch_jobs_limit(monkeypatch, tmp_path: pathlib.Path):
 
     monkeypatch.setattr(asyncio, "to_thread", _fake_to_thread)
 
-    # Stub grab to no‑op; batch indirectly calls it via to_thread
+    # Stub grab to no-op; batch indirectly calls it via to_thread
     monkeypatch.setattr("site_downloader.cli.grab", lambda *a, **kw: None)
 
     url_file = tmp_path / "urls.txt"

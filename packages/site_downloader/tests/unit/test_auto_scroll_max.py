@@ -1,4 +1,4 @@
-"""Edge‑case: _auto_scroll must stop at max_scrolls even if height grows."""
+"""Edge-case: _auto_scroll must stop at max_scrolls even if height grows."""
 
 from site_downloader.fetcher import _auto_scroll
 

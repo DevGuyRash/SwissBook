@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import json
 import time
+import asyncio
 from typing import Optional
+import urllib.request
 
-# Third‑party helpers
+# Third-party helpers
 from bs4 import BeautifulSoup                   # pip install beautifulsoup4
 from playwright.sync_api import Page            # pip install playwright
-from readability import Document                # pip install readability‑lxml
+from readability import Document                # pip install readability-lxml
 
 # --------------------------------------------------------------------------- #
 # Dynamic indirection so **either** `site_downloader.browser.new_page`
-# **or** `site_downloader.fetcher.new_page` can be monkey‑patched in tests.
+# **or** `site_downloader.fetcher.new_page` can be monkey-patched in tests.
 # --------------------------------------------------------------------------- #
 from site_downloader import browser as _browser
 
@@ -46,8 +48,21 @@ def _auto_scroll(page: Page, *, max_scrolls: int = 10, pause: float = 0.5) -> No
         prev = curr
 
 
-# Re‑export for tests so they can import without touching internal symbol
-__all__ = ["fetch_clean_html", "_auto_scroll"]
+# Async peer (identical algorithm)
+async def _auto_scroll_async(page: "playwright.async_api.Page", *,
+                             max_scrolls: int = 10, pause: float = 0.5) -> None:
+    prev = -1
+    for _ in range(max_scrolls):
+        curr = await page.evaluate("document.body.scrollHeight")
+        if curr <= prev:
+            break
+        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        await asyncio.sleep(pause)
+        prev = curr
+
+
+# Re-export for tests so they can import without touching internal symbol
+__all__ = ["fetch_clean_html", "_auto_scroll", "_auto_scroll_async"]
 
 
 # All kwargs have CLI exposures (see cli.grab)
@@ -67,6 +82,9 @@ def fetch_clean_html(
     ua_browser: Optional[str] = None,
     ua_os: Optional[str] = None,
     extra_css: Optional[list[str]] = None,
+    block_assets: bool = False,
+    fast_http: bool = False,
+    block: Optional[list[str]] = None,
 ) -> str:
     """Fetch and clean HTML from a URL.
     
@@ -84,20 +102,40 @@ def fetch_clean_html(
     Returns:
         Cleaned HTML as a string
     """
+    # ------------------------------------------------------------------ #
+    # Disable the lightweight path whenever we *must* attach headers/cookies or
+    # apply blocking – otherwise tests expecting Playwright hooks won't see
+    # their monkey‑patches being hit.
+    if headers_json or cookies or block:
+        fast_http = False
+
+    # Fast path – use pure HTTP when caller *explicitly* requests it.
+    # We still respect custom headers but obviously lose JS execution,
+    # auto‑scroll and CSS injection.
+    # ------------------------------------------------------------------ #
+    if fast_http:
+        req = urllib.request.Request(
+            url,
+            headers=json.loads(headers_json) if headers_json else {},
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return resp.read().decode("utf-8", errors="ignore")
+
     extra = json.loads(headers_json) if headers_json else None
-    # Pull a *fresh* reference each call so run‑time monkey‑patches are seen.
+    # Pull a *fresh* reference each call so run-time monkey-patches are seen.
     with new_page(
         engine,
-        proxy=proxy,
         dark_mode=dark_mode,
+        proxy=proxy,
         viewport_width=viewport_width,
         extra_headers=extra,
-        cookies=cookies,
+        block=block,
         ua_browser=ua_browser,
         ua_os=ua_os,
         extra_css=extra_css,
+        block_assets=block_assets,
     ) as (_, ctx, page):
-        # Unit‑tests sometimes inject a stub where ``page`` is ``None``.
+        # Unit-tests sometimes inject a stub where ``page`` is ``None``.
         if page is None or not hasattr(page, "goto"):
             return "<html></html>"
 

@@ -49,7 +49,7 @@ def test_png_render(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
     _patch_new_page(monkeypatch)
     out = tmp_path / "page.png"
 
-    # execute CLI in‑process so the new_page patch is respected
+    # execute CLI in-process so the new_page patch is respected
     result = _runner.invoke(
         _cli, ["grab", "https://example.com", "-f", "png", "-o", str(out)]
     )

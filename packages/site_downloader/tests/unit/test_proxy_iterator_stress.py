@@ -1,5 +1,5 @@
 """
-Ensure a single‑value proxy pool never exhausts (10 000 iterations).
+Ensure a single-value proxy pool never exhausts (10 000 iterations).
 """
 from site_downloader.proxy import pool
 
