@@ -1,5 +1,5 @@
 FROM alpine:3.20
-RUN apk add --no-cache pulseaudio bash bats \
+RUN apk add --no-cache pulseaudio pulseaudio-utils bash bats \
  && adduser -D -u 1000 -h /home/test test \
  && mkdir -p /run/user/1000 \
  && chown test:test /run/user/1000
