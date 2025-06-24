@@ -12,14 +12,11 @@ This repository currently contains the following standalone tools:
 | :------------------ | :-------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------- |
 | **Site Downloader** | `sdl`           | A versatile web page downloader and converter. It fetches, cleans, and converts pages to PDF, PNG, Markdown, DOCX, and more using Playwright. | [**`packages/site_downloader/README.md`**](packages/site_downloader/README.md) |
 | **YouTube Bulk CC** | `yt_bulk_cc.py` | A script to bulk-download YouTube transcripts for single videos, playlists, or entire channels-no API key required.                           | See built-in help (`--help`)                                                   |
+| **EC Toggle** | `ec_toggle`     | A simple CLI to toggle echo cancellation on an audio device.                                                                        | [**`packages/ec_toggle/README.md`**](packages/ec_toggle/README.md)             |
 
 ---
 
 ## 📁 Directory layout
-
-.
-+-- packages/ # One sub-folder per language-specific package or library
-+-- README.md
 
 | Folder      | Purpose                                                                                                                                       | Typical contents                  |
 | :---------- | :-------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------- |
@@ -59,6 +56,9 @@ python -m playwright install --with-deps
 
 # Install the YouTube Bulk CC script and its dependencies
 uv pip install -e "packages/yt_bulk_cc"
+
+# Install the EC2 Toggle and its dependencies
+uv pip install -e "packages/ec_toggle"
 ```
 
 ### 4. Basic usage
@@ -82,16 +82,31 @@ sdl grab ./path/to/urls.txt -f png -j 4
 
 ```bash
 # Get transcripts for a whole playlist as individual JSON files
-python -m yt_bulk_cc.yt_bulk_cc "https://youtube.com/playlist?list=PLxyz123" -f json
+python -m yt_bulk_cc.yt_bulk_cc "https://www.youtube.com/playlist?list=YOUR_PLAYLIST_ID" -f json
 
 # Get a single video's transcript as plain text with timestamps
-python -m yt_bulk_cc.yt_bulk_cc https://youtu.be/dQw4w9WgXcQ -f text -t
+python -m yt_bulk_cc.yt_bulk_cc https://www.youtube.com/watch?v=VIDEO_ID -f text -t
 
 # Combine all transcripts from a channel into a single file
-python -m yt_bulk_cc.yt_bulk_cc "https://www.youtube.com/@CrashCourse/videos" -f text -C combined_transcripts
+python -m yt_bulk_cc.yt_bulk_cc "https://www.youtube.com/channel/YOUR_CHANNEL_ID" -f text -C combined_transcripts
 ```
 
 > See the script's built-in help for all options: `python -m yt_bulk_cc.yt_bulk_cc --help`
+
+#### EC2 Toggle (`ec_toggle`)
+
+```bash
+# List instances tagged with "Project=SwissBook" (dry-run)
+ec_toggle list --tag "Project=SwissBook"
+
+# Start a specific instance by its ID in the us-west-2 region
+ec_toggle start --id "i-1234567890abcdef0" --region "us-west-2"
+
+# Stop all instances with the tag "Env=Dev"
+ec_toggle stop --tag "Env=Dev"
+```
+
+> See the [**`ec_toggle` README**](packages/ec_toggle/README.md) for all options.
 
 ---
 
