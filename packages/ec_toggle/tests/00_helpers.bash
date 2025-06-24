@@ -18,6 +18,7 @@ PATH="$stub_bin_dir:$PATH"
 load '../src/ec_toggle/ec-toggle'
 
 # ------------------------------------------------------------------ ASSERTS --
+# ── tiny assert helpers (avoid external bats-assert) ────────────────────────
 assert_success() { [ "$status" -eq 0 ] || { echo "expected success, got $status"; return 1; }; }
 assert_failure() { [ "$status" -ne 0 ] || { echo "expected failure, got $status"; return 1; }; }
 
