@@ -75,8 +75,8 @@ Commands:
 Options:
   -s, --sink NAME       Use NAME as *sink_master* (playback)
   -m, --source NAME     Use NAME as *source_master* (microphone)
-  -l, --latency N/D     Node latency  (default ${DEFAULT_LATENCY})
-  -p, --preset NAME     default|gaming|studio|rnnoise
+  -l, --latency N/D     Node latency (PipeWire only, default: ${DEFAULT_LATENCY})
+  -p, --preset NAME     Preset (PipeWire only, see below for values)
   -d, --dry-run         Print actions without applying them
   -j, --json            JSON status output
       --force           Ignore already-enabled / disabled errors
@@ -85,26 +85,26 @@ Options:
 Details
 =======
 Sources & Sinks
-  * *source_master* – the **raw microphone** you want cleaned.
-  * *sink_master*   – the **speaker / monitor** whose signal is subtracted
-    (stops your mic from picking up game/meeting audio bleeding from speakers).
-    Omit both flags to let ec-toggle use your current PipeWire / PulseAudio
-    defaults automatically.
-
-Latency
-  Format is **frames/sample-rate**, e.g. `256/48000` ≈ 5.3 ms.  Lower =
-  snappier but heavier CPU.
+  * *source_master* - the **raw microphone** you want cleaned.
+  * *sink_master*   - the **speaker / monitor** whose signal is subtracted.
+  Omit both flags to let ec-toggle use your current defaults automatically.
 
 What gets created
-  • `EchoCancelled Mic`   – use this in OBS / Discord / Zoom.  
-  • `EchoCancelled Sink`  – only when you pass **--sink** (PipeWire only).
+  • The script creates a virtual source: `EchoCancelled Mic` (PipeWire) or
+     `ec_source` (PulseAudio). Use this virtual source in your apps.
+  • PipeWire also creates `EchoCancelled Sink` and `EchoCancelled Playback` nodes.
+  • PulseAudio creates a corresponding `ec_sink`.
 
-Preset cheat-sheet
+PipeWire Presets & Latency
+  The --preset and --latency flags only apply when using PipeWire. PulseAudio
+  uses a default, non-configurable WebRTC echo canceller.
+
+  • Latency format: **frames/sample-rate**, e.g. `256/48000` ≈ 5.3 ms.
   • Presets:
-        default  – WebRTC echo + noise (balanced)
-        gaming   – low-CPU, lighter suppression
-        studio   – stronger gate, lower floor
-        rnnoise  – ML-based noise-only, little echo subtraction
+        default  - WebRTC echo + noise (balanced)
+        gaming   - low-CPU, lighter suppression
+        studio   - stronger gate, lower floor
+        rnnoise  - ML-based noise-only, little echo subtraction
 
     ┌───────────────────────────────────────────────────────────────────────────────┐
     │               Quick preset comparison (★ ≈ 25 % of one CPU core)              │
@@ -118,8 +118,8 @@ Preset cheat-sheet
     └─────────┴─────┴──────────────┴────────────────┴───────────────────────────────┘
 
 Files it writes
-  PipeWire  →  ${PW_CONF_FILE}  
-  PulseAudio→  loads module in memory (index cached in ${PA_IDX_FILE})
+  PipeWire   →  ${PW_CONF_FILE}  
+  PulseAudio →  loads module in memory (index cached in ${PA_IDX_FILE})
 
 Disable / watch loops
   `$ ec-toggle disable` removes those files/modules again.  
