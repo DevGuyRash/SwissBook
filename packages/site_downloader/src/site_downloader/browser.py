@@ -39,7 +39,7 @@ _LOCK = threading.Lock()
 
 ASSETS_DIR = pathlib.Path(__file__).parent / "assets"
 # ---------------------------------------------------------------------------- #
-# CSS *read‑cache* – saves repeated disk IO when grab/batch injects the same
+# CSS *read‑cache* - saves repeated disk IO when grab/batch injects the same
 # stylesheet hundreds of times.
 # ---------------------------------------------------------------------------- #
 _DEFAULT_ANNOY = (ASSETS_DIR / DEFAULT_ANNOY_CSS).read_text(encoding="utf-8")
@@ -141,7 +141,7 @@ def new_page(
 
         key = (engine, proxy)
         if key not in _BROWSERS:
-            launcher = getattr(_PW, engine)    # lazy – stub‑friendly
+            launcher = getattr(_PW, engine)    # lazy - stub‑friendly
             _BROWSERS[key] = launcher.launch(
                 headless=True,
                 proxy={"server": proxy} if proxy else None,
@@ -214,7 +214,7 @@ def new_page(
             )
 
     def _read_css(path: pathlib.Path) -> str:
-        """Read *path* once – subsequent calls are served from an in‑memory cache."""
+        """Read *path* once - subsequent calls are served from an in‑memory cache."""
         key = str(path.resolve())
         css = _CSS_CACHE.get(key)
         if css is None:
@@ -235,7 +235,7 @@ def new_page(
 
 
 # --------------------------------------------------------------------------- #
-#  Async variant – identical semantics · returns **async context‑manager**
+#  Async variant - identical semantics · returns **async context‑manager**
 # --------------------------------------------------------------------------- #
 
 @contextlib.asynccontextmanager
@@ -258,7 +258,7 @@ async def anew_page(
     # ------------------------------------------------------------------ #
     #  Fallback stub when Playwright isn't installed (CI environments)   #
     # ------------------------------------------------------------------ #
-    if async_playwright is None:     # pragma: no cover – playwright not installed
+    if async_playwright is None:     # pragma: no cover - playwright not installed
         # A *very* small stub good enough for our unit‑tests
         class _DummyRoute:
             def __init__(self, typ): self._typ = typ
@@ -286,7 +286,7 @@ async def anew_page(
     pw = await async_playwright().start()
     browser_key = (engine, proxy)
     if browser_key not in _BROWSERS:
-        launcher = getattr(pw, engine)    # lazy – stub‑friendly
+        launcher = getattr(pw, engine)    # lazy - stub‑friendly
         _BROWSERS[browser_key] = await launcher.launch(
             headless=True, proxy={"server": proxy} if proxy else None
         )

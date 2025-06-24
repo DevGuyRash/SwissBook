@@ -77,7 +77,7 @@ def render_page(
             screen_path = out.with_suffix(".screen.pdf")
             print_path  = out.with_suffix(".print.pdf")
 
-            # ––– screen render – try streaming first, fall back to file path –––
+            # --- screen render - try streaming first, fall back to file path ---
             page.emulate_media(media="screen")
             try:
                 data = page.pdf(
@@ -102,7 +102,7 @@ def render_page(
                     data if isinstance(data, (bytes, bytearray)) else data.encode()
                 )
 
-            # ––– print render – try streaming first, fall back to file path –––
+            # --- print render - try streaming first, fall back to file path ---
             page.emulate_media(media="print")
             try:
                 data = page.pdf(

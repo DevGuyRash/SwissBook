@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────────────────
-#  ec-toggle – Advanced echo / noise-cancellation manager for Linux audio
+#  ec-toggle - Advanced echo / noise-cancellation manager for Linux audio
 #
 #  Version : 4.2   (2025-06-23; master-device binding + misc polish)
 #  License : MIT   (SPDX-License-Identifier: MIT)
@@ -69,7 +69,6 @@ Commands:
   status           Show whether cancellation is active
   list             List current audio nodes
   watch            Background poller that re-enables on hot-plug
-  self-update      Fast-forward to latest signed tag from upstream
   --generate-systemd-unit   Emit a systemd user service for "watch"
   --version        Show version
 
@@ -83,18 +82,48 @@ Options:
       --force           Ignore already-enabled / disabled errors
       --help            Show this help
 
-Notes:
-  • *source_master* is the raw mic you want cleaned.
-  • *sink_master*   is the speaker / monitor signal the filter subtracts to
-    remove far-end echo.  Omit both flags to use your current defaults.
-  • The command creates a virtual **"EchoCancelled Mic"** (and optional
-    EchoCancelled Sink).  Select those in Zoom / OBS / Discord to get the
-    filtered audio.
+Details
+=======
+Sources & Sinks
+  * *source_master* – the **raw microphone** you want cleaned.
+  * *sink_master*   – the **speaker / monitor** whose signal is subtracted
+    (stops your mic from picking up game/meeting audio bleeding from speakers).
+    Omit both flags to let ec-toggle use your current PipeWire / PulseAudio
+    defaults automatically.
+
+Latency
+  Format is **frames/sample-rate**, e.g. `256/48000` ≈ 5.3 ms.  Lower =
+  snappier but heavier CPU.
+
+What gets created
+  • `EchoCancelled Mic`   – use this in OBS / Discord / Zoom.  
+  • `EchoCancelled Sink`  – only when you pass **--sink** (PipeWire only).
+
+Preset cheat-sheet
   • Presets:
         default  – WebRTC echo + noise (balanced)
         gaming   – low-CPU, lighter suppression
         studio   – stronger gate, lower floor
         rnnoise  – ML-based noise-only, little echo subtraction
+
+    ┌───────────────────────────────────────────────────────────────────────────────┐
+    │               Quick preset comparison (★ ≈ 25 % of one CPU core)              │
+    ├─────────┬─────┬──────────────┬────────────────┬───────────────────────────────┤
+    │  Name   │ CPU │ Echo-cancel  │ Noise-suppress │           Use-case            │
+    ├─────────┼─────┼──────────────┼────────────────┼───────────────────────────────┤
+    │ default │ **  │    good      │     good       │ calls & meetings *(balanced)* │
+    │ gaming  │  *  │    fair      │     light      │ gaming / low-power *(light)*  │
+    │ studio  │ *** │    good      │    strong      │ podcast / VO *(strong)*       │
+    │ rnnoise │ ****│     n/a      │   excellent    │ noisy rooms *(noise-only)*    │
+    └─────────┴─────┴──────────────┴────────────────┴───────────────────────────────┘
+
+Files it writes
+  PipeWire  →  ${PW_CONF_FILE}  
+  PulseAudio→  loads module in memory (index cached in ${PA_IDX_FILE})
+
+Disable / watch loops
+  `$ ec-toggle disable` removes those files/modules again.  
+  `$ ec-toggle watch` keeps them alive after hot-plug or backend restarts.
 
 Run "ec-toggle list" to see exact device names you can pass to --source / --sink.
 EOF
@@ -125,7 +154,7 @@ while [[ $# -gt 0 ]]; do
     status)             SUBCMD="status" ; shift ;;
     list)               SUBCMD="list"   ; shift ;;
     watch)              SUBCMD="watch"  ; shift ;;
-    self-update)        SUBCMD="selfupd"; shift ;;
+
     --generate-systemd-unit) SUBCMD="genunit"; shift ;;
     -s|--sink)     SINK_OVERRIDE="$2";   shift 2 ;;
     -m|--source)   SOURCE_OVERRIDE="$2"; shift 2 ;;
@@ -233,7 +262,7 @@ pw_enable() {
   [[ -n "$DRY_RUN" ]] && { log info "(dry-run) would install PipeWire conf"; return; }
   mv "$TMP_FILE" "$PW_CONF_FILE"
   command -v restorecon &>/dev/null && restorecon -F "$PW_CONF_FILE" || true
-  pw_reload || { rm -f "$PW_CONF_FILE"; die "PipeWire restart failed – rolled back."; }
+  pw_reload || { rm -f "$PW_CONF_FILE"; die "PipeWire restart failed - rolled back."; }
   wpctl set-default "EchoCancelled Mic" || true
 }
 
@@ -320,28 +349,6 @@ UNIT
   exit 0
 }
 
-###############################################################################
-# SELF-UPDATE (signed tags only)
-###############################################################################
-self_update() {
-  need git
-  local dir remote tag
-  dir=$(git -C "$(dirname "$(realpath "$0")")" rev-parse --show-toplevel)
-  remote="origin"
-  [[ $(git -C "$dir" remote get-url "$remote") == *yourrepo/ec-toggle* ]] \
-      || die "Remote '$remote' is not the official repository."
-
-  tag=$(git -C "$dir" ls-remote --tags "$remote" \
-          | awk '{print $2}' | grep -E 'refs/tags/v[0-9.]+' \
-          | sort -V | tail -n1)
-  git -C "$dir" fetch --tags "$remote" "$tag"
-  git -C "$dir" verify-tag "$tag" || die "Tag signature verification failed."
-  git -C "$dir" checkout "$tag"
-  log info "✅ Updated to $(basename "$tag"). Restart ec-toggle."
-  exit 0
-}
-
-
 
 ###############################################################################
 # COMMAND DISPATCH
@@ -352,12 +359,11 @@ case "$SUBCMD" in
   status)   [[ "$BACKEND" = pipewire ]] && pw_status   || pa_status ;;
   list)     [[ "$BACKEND" = pipewire ]] && pw_list     || pa_list ;;
   genunit)  gen_unit ;;
-  selfupd)  self_update ;;
   watch)
     while true; do
       ([[ "$BACKEND" = pipewire ]] && pw_status | grep -q true) \
         || ([[ "$BACKEND" = pulseaudio ]] && pa_status | grep -q true) \
-        || { log warn "Not active – re-enabling…"; [[ "$BACKEND" = pipewire ]] && pw_enable || pa_enable; }
+        || { log warn "Not active - re-enabling…"; [[ "$BACKEND" = pipewire ]] && pw_enable || pa_enable; }
       sleep 30
     done ;;
   *) usage ;;

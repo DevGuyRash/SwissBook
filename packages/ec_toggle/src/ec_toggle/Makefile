@@ -7,7 +7,7 @@ chmod-tests:
 
 test: chmod-tests
 	@if [ -z "$(BATS)" ]; then \
-	    echo "💥 bats not found – install with 'sudo dnf install bats' or 'sudo pacman -S bats'"; \
+	    echo "💥 bats not found - install with 'sudo dnf install bats' or 'sudo pacman -S bats'"; \
 	    exit 1; \
 	 fi
 	@$(BATS) tests/*_unit_*.bats

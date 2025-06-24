@@ -11,7 +11,7 @@ import shutil
 import asyncio
 
 # --------------------------------------------------------------------------- #
-#  Async helper used by the internal ``_batch`` worker – imported lazily so   #
+#  Async helper used by the internal ``_batch`` worker - imported lazily so   #
 #  it is available both to the library *and* to tests that monkey‑patch it.   #
 # --------------------------------------------------------------------------- #
 from site_downloader.batch_async import grab_async  # noqa: E402  (late import)
@@ -332,7 +332,7 @@ def batch(
         return v.default if isinstance(v, OptionInfo) else v
 
     async def worker(url_: str):
-        # run in a *thread* so   – important for test_batch_semaphore_limit
+        # run in a *thread* so   - important for test_batch_semaphore_limit
         # which monkey‑patches ``asyncio.to_thread`` to check concurrency.
         await asyncio.to_thread(
             grab,
