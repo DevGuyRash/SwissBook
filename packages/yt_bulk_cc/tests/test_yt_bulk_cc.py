@@ -22,7 +22,7 @@ import re
 # ---------------------------------------------------------------------------
 # ensure scripts/ is importable
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "src" / "yt_bulk_cc"))
 
 import yt_bulk_cc as ytb  # noqa: E402  (import after path tweak)
 
@@ -80,7 +80,7 @@ def patch_detect(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# helper to invoke main() with patched argv – catch SystemExit cleanly
+# helper to invoke main() with patched argv - catch SystemExit cleanly
 def run_cli(tmp_path: Path, *argv: str) -> None:
     sys.argv[:] = ["yt_bulk_cc.py", *argv]
     # patch output folder to tmp_path if not explicitly passed
@@ -373,7 +373,7 @@ def test_single_video_flow(tmp_path: Path, monkeypatch):
         "-o",
         str(tmp_path),
         "-f",
-        "srt",                       # ← default is now JSON – request SRT explicitly
+        "srt",                       # ← default is now JSON - request SRT explicitly
     ]
     ytb.asyncio.run(ytb.main())
 
@@ -560,7 +560,7 @@ def test_convert_video_separators(tmp_path, patch_transcript, patch_scrapetube,
 _ANSI_RE = re.compile(r"\x1B\[[0-9;]*[A-Za-z]")
 
 def _strip_ansi(txt: str) -> str:
-    """Remove colour escape sequences – keeps test parsing simple."""
+    """Remove colour escape sequences - keeps test parsing simple."""
     return _ANSI_RE.sub("", txt)
 
 
@@ -681,7 +681,7 @@ def test_json_split_char_limit_respected(tmp_path: Path):
     )
     for part in tmp_path.glob("combo_*.json"):
         _, _, c = ytb._stats(part.read_text())
-        assert c <= 5000, f"{part.name} has {c} chars – exceeds 5 000 cap"
+        assert c <= 5000, f"{part.name} has {c} chars - exceeds 5 000 cap"
 
 
 # ---------------------------------------------------------------------------
@@ -706,7 +706,7 @@ Hardening / resilience tests that go beyond the spec-checklist:
 """
 
 # ──────────────────────────────────────────────────────────────────────────
-# 1. Retry logic – TooManyRequests raises twice, then succeeds
+# 1. Retry logic - TooManyRequests raises twice, then succeeds
 # ──────────────────────────────────────────────────────────────────────────
 
 

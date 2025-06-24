@@ -352,5 +352,6 @@ pip-selfcheck.json
 *repomix*
 *.srt
 *.vtt
-*.json
+**/packages/yt_bulk_cc/**/*.json
 *.txt
+*coverage*

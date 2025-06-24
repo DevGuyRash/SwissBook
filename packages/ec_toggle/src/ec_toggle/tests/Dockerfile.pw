@@ -1,0 +1,4 @@
+FROM fedora:40
+RUN dnf -y install pipewire wireplumber procps bats
+COPY ec-toggle /usr/local/bin/
+ENTRYPOINT ["bats", "/tests/10_int_pw.bats"]

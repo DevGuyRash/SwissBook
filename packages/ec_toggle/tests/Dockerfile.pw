@@ -1,0 +1,12 @@
+FROM docker.io/fedora:40
+RUN dnf -y --setopt=install_weak_deps=False install pipewire wireplumber bats \
+ && useradd -m -u 1000 test \
+ && mkdir -p /run/user/1000 \
+ && chown test:test /run/user/1000
+
+ENV XDG_RUNTIME_DIR=/run/user/1000
+USER test
+
+COPY src/ec_toggle/ec-toggle /usr/local/bin/
+COPY tests/10_int_pw.bats /tests/
+ENTRYPOINT ["bats", "/tests/10_int_pw.bats"]

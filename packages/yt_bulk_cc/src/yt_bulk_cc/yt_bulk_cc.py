@@ -29,7 +29,7 @@ import argparse
 import asyncio
 import contextlib
 import datetime
-import os            # NEW – Windows pathname tweak
+import os            # NEW - Windows pathname tweak
 import inspect
 import json
 import logging
@@ -292,19 +292,19 @@ def _coerce_attr(seq):
 # ────────────────────────── helper ──────────────────────────
 def _extract_cues(blob):
     """
-    Return a flat list of cue‑dicts no matter whether *blob* is:
-      •   a normal per‑video JSON  (has "transcript")
+    Return a flat list of cue-dicts no matter whether *blob* is:
+      •   a normal per-video JSON  (has "transcript")
       •   one element inside "items" of a concatenated JSON
       •   a full concatenated JSON (has "items" only)
     """
-    if "transcript" in blob:                 # single‑video file
+    if "transcript" in blob:                 # single-video file
         return blob["transcript"]
     if "items" in blob:                      # concatenated parent
         cues = []
         for item in blob["items"]:
             cues.extend(_extract_cues(item)) # recurse one level
         return cues
-    return []                                # fallback – no cues
+    return []                                # fallback - no cues
 
 def convert_existing(
     src: str, dest_fmt: str, out_dir: Path, *, include_stats: bool = True
@@ -318,7 +318,7 @@ def convert_existing(
             logging.warning("Skip unreadable JSON %s (%s)", jfile, e)
             continue
 
-        # Robust cue extraction (handles both per‑video and
+        # Robust cue extraction (handles both per-video and
         # concatenated JSONs transparently)
         cues = _extract_cues(data)
         if not cues:
@@ -344,20 +344,20 @@ def convert_existing(
                 parts, meta_acc = [], []
                 for item in data["items"]:
                     meta = {k: item[k] for k in ("video_id", "title", "url")}
-                    if not many_srt:          # no visual separator in bare‑SRT mode
+                    if not many_srt:          # no visual separator in bare-SRT mode
                         parts.append("──── {video_id} ── {title}\n".format(**meta))
                     parts.append(_render_one(meta, item["transcript"]))
                     meta_acc.append((meta["video_id"], meta["title"]))
                 body = "\n".join(parts)
 
-                # optional file‑wide header
+                # optional file-wide header
                 add_header = include_stats and not many_srt
                 if add_header:
                     hdr, *_ = _fixup_loop(_stats(body), dest_fmt, meta_acc)
                     new_txt = hdr + body
                 else:
                     new_txt = body
-            else:                               # single‑video JSON
+            else:                               # single-video JSON
                 meta = {k: data[k] for k in ("video_id", "title", "url")}
                 new_txt = _render_one(meta, cues)
 
@@ -398,7 +398,7 @@ async def grab(
 
                 # ───────────────────────── DEBUG A ─────────────────────────
                 logging.debug(
-                    "grab[%s] About to call .get_transcript – "
+                    "grab[%s] About to call .get_transcript - "
                     "api=%r  sig=%s  kwargs=%s  NoTranscriptFound-id=%s",
                     vid,
                     YouTubeTranscriptApi,
@@ -430,7 +430,7 @@ async def grab(
                     if include_stats:
                         for _ in range(3):                          # converges fast
                             # Make the measurement on **exactly** the same
-                            # text that will be written to disk – including
+                            # text that will be written to disk - including
                             # the final newline that json.dumps omits.
                             tmp = json.dumps(payload, indent=2,
                                             ensure_ascii=False)
@@ -602,7 +602,7 @@ async def main() -> None:
     # ──────────────── NEW: stats on/off ──────────────────
     stats_group = P.add_mutually_exclusive_group()
     stats_group.add_argument("--stats",     dest="stats", action="store_true",
-                             help="Embed per‑file stats headers (default)")
+                             help="Embed per-file stats headers (default)")
     stats_group.add_argument("--no-stats",  dest="stats", action="store_false",
                              help="Skip stats headers / blocks")
     P.set_defaults(stats=True)
@@ -865,7 +865,7 @@ async def main() -> None:
         from rich.console import Console            # NEW
         async def rich_gather(coros):
             # Use a dedicated Console that writes **only** to the real TTY,
-            # so progress updates never reach the tee‑ed log file.
+            # so progress updates never reach the tee-ed log file.
             term = Console(file=sys.__stdout__, force_terminal=True)
             with Progress(
                 SpinnerColumn(),
@@ -912,7 +912,7 @@ async def main() -> None:
     # -----------------------------------------------------------------
     def _emit_final_summary() -> None:
         """
-        Write the per‑category lists first, then the one‑liner roll‑up so the
+        Write the per-category lists first, then the one-liner roll-up so the
         **last** record in both the console *and* the file log is always the
         coloured 'Summary: …' line.
         """
@@ -928,7 +928,7 @@ async def main() -> None:
 
         # make sure everything printed so far is on disk before appending
         sys.stdout.flush()
-        # Emit the roll‑up *after* the lists.
+        # Emit the roll-up *after* the lists.
         logging.info(
             "Summary: ✓ %s   •  ↯ no-caption %s   •  ⚠ failed %s   (total %s)",
             len(ok), len(none), len(fail), len(ok) + len(none) + len(fail),
@@ -979,7 +979,7 @@ async def main() -> None:
 
                 payload = {"items": current_objs}
 
-                # ── final‑serialise once, measure, then (optionally) embed stats ──
+                # ── final-serialise once, measure, then (optionally) embed stats ──
                 txt = json.dumps(payload, ensure_ascii=False, indent=2)
                 if not txt.endswith("\n"):
                     txt += "\n"
@@ -988,7 +988,7 @@ async def main() -> None:
                         txt  = json.dumps(payload, indent=2, ensure_ascii=False)
                         new  = _stats(txt)
                         if payload.get("stats") == {"words": new[0], "lines": new[1], "chars": new[2]}:
-                            break                     # self‑consistent
+                            break                     # self-consistent
                         payload["stats"] = {"words": new[0], "lines": new[1], "chars": new[2]}
 
                 tgt.write_text(txt, encoding="utf-8")
@@ -1014,7 +1014,7 @@ async def main() -> None:
                 try:
                     src = next(out_dir.glob(f"*[{vid}]*.json"))
                 except StopIteration:
-                    logging.warning("File for %s not found – prefix off?", vid)
+                    logging.warning("File for %s not found - prefix off?", vid)
                     continue
 
                 try:
@@ -1084,7 +1084,7 @@ async def main() -> None:
                 try:
                     src = next(out_dir.glob(f"*[{vid}]*.{EXT[args.format]}"))
                 except StopIteration:
-                    logging.warning("File for %s not found – prefix off?", vid)
+                    logging.warning("File for %s not found - prefix off?", vid)
                     continue
                 try:
                     txt = src.read_text(encoding="utf-8")
