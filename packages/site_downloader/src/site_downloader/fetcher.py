@@ -105,13 +105,13 @@ def fetch_clean_html(
     # ------------------------------------------------------------------ #
     # Disable the lightweight path whenever we *must* attach headers/cookies or
     # apply blocking – otherwise tests expecting Playwright hooks won't see
-    # their monkey‑patches being hit.
+    # their monkey-patches being hit.
     if headers_json or cookies or block:
         fast_http = False
 
     # Fast path – use pure HTTP when caller *explicitly* requests it.
     # We still respect custom headers but obviously lose JS execution,
-    # auto‑scroll and CSS injection.
+    # auto-scroll and CSS injection.
     # ------------------------------------------------------------------ #
     if fast_http:
         req = urllib.request.Request(

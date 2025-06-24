@@ -1,6 +1,6 @@
 """
 Async sibling of `cli.grab` – internal use by cli.batch.
-Only 'remote' code‑paths are async‑capable; local‑file flows fall back to
+Only 'remote' code-paths are async-capable; local-file flows fall back to
 the original sync helpers transparently.
 """
 from __future__ import annotations
@@ -19,6 +19,7 @@ async def grab_async(
     *,
     fmt: str = "html",
     out: Optional[pathlib.Path] = None,
+    engine: str = "chromium",
     proxy: str | None = None,
     proxies: str | None = None,
     proxy_file: pathlib.Path | None = None,
@@ -58,9 +59,10 @@ async def grab_async(
 
     # ------- rendered ------------------------------------------------------ #
     if fmt in {"pdf", "png"}:
-        await renderer.render_page_async(        # updated async entry‑point
+        await renderer.render_page_async(        # updated async entry-point
             url,
             out,
+            engine=engine,
             proxy=next(_proxy_cycle),
             headers_json=headers_json,
             dark_mode=dark_mode,
@@ -76,6 +78,7 @@ async def grab_async(
 
     # ------- textual ------------------------------------------------------- #
     async with anew_page(
+        engine=engine,
         proxy=next(_proxy_cycle),
         dark_mode=dark_mode,
         viewport_width=viewport_width,

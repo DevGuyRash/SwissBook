@@ -1,5 +1,5 @@
 """
-Repeated injection of the same extra‑CSS file must hit the in‑memory cache.
+Repeated injection of the same extra-CSS file must hit the in-memory cache.
 """
 import pathlib
 from site_downloader import browser

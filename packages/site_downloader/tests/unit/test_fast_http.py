@@ -1,11 +1,11 @@
 """
-Fast‑HTTP path must bypass Playwright & return body.
+Fast-HTTP path must bypass Playwright & return body.
 """
 import site_downloader.fetcher as _fetcher
 
 def test_fast_http(monkeypatch):
     html_stub = "<html><body>hi</body></html>"
-    # monkey‑patch urllib so there is zero network traffic
+    # monkey-patch urllib so there is zero network traffic
     class _Resp:
         def __enter__(self): return self
         def __exit__(self, *exc): pass

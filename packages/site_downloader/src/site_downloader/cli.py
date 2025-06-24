@@ -12,7 +12,7 @@ import asyncio
 
 # --------------------------------------------------------------------------- #
 #  Async helper used by the internal ``_batch`` worker – imported lazily so   #
-#  it is available both to the library *and* to tests that monkey‑patch it.   #
+#  it is available both to the library *and* to tests that monkey-patch it.   #
 # --------------------------------------------------------------------------- #
 from site_downloader.batch_async import grab_async  # noqa: E402  (late import)
 from typing import Any, Optional, List
@@ -80,7 +80,7 @@ def grab(
         None,
         "--block",
         "-b",
-        help="Comma‑separated resource types to abort: img,video,audio,media",
+        help="Comma-separated resource types to abort: img,video,audio,media",
     ),
     viewport_width: int = Opt(
         DEFAULT_VIEWPORT, "--viewport-width", help="Viewport width px"
@@ -294,11 +294,18 @@ def batch(
     fmt: str = Opt("pdf", "--format", "-f", help="Output format"),
     jobs: int = Opt(4, "--jobs", "-j", help="Concurrency"),
     # Forward proxy options
+    engine: str = Opt("chromium", "--engine", "-e", help="chromium | firefox | webkit"),
     proxy: Optional[str] = Opt(None, "--proxy", help="HTTP proxy, e.g. http://host:3128"),
     proxies: Optional[str] = Opt(None, "--proxies", help="Comma-separated proxy list"),
     proxy_file: Optional[pathlib.Path] = Opt(
         None, "--proxy-file", help="File containing proxies (1/line)"
     ),
+    headers: Optional[str] = Opt(None, "--headers", help="Extra HTTP headers as JSON string"),
+    dark_mode: bool = Opt(False, "--dark-mode", help="prefers-color-scheme: dark"),
+    viewport_width: int = Opt(
+        DEFAULT_VIEWPORT, "--viewport-width", help="Viewport width px"
+    ),
+    quality: float = Opt(DEFAULT_SCALE, "--quality", "-q", help="device-scale-factor"),
     # Forward other options
     ua_browser: Optional[str] = Opt(None, "--ua-browser", help="Prefer UA from this browser family"),
     ua_os: Optional[str] = Opt(None, "--ua-os", help="windows/linux/macos/android/ios"),
@@ -327,50 +334,77 @@ def batch(
     outdir = pathlib.Path("out")
     outdir.mkdir(exist_ok=True)
 
-    def _plain(v):
-        """Unwrap Typer's OptionInfo when we call grab() programmatically."""
-        return v.default if isinstance(v, OptionInfo) else v
-
-    async def worker(url_: str):
-        # run in a *thread* so   – important for test_batch_semaphore_limit
-        # which monkey‑patches ``asyncio.to_thread`` to check concurrency.
-        await asyncio.to_thread(
-            grab,
-            url_,
-            fmt=_plain(fmt),
-            proxy=_plain(proxy),
-            proxies=_plain(proxies),
-            proxy_file=_plain(proxy_file),
-            cookies_json=_plain(cookies_json),
-            cookies_file=_plain(cookies_file),
-            ua_browser=_plain(ua_browser),
-            ua_os=_plain(ua_os),
-            extra_css=_plain(extra_css),
-            block=_plain(block),
-        )
-
-    # Run with limited concurrency
-    sem = asyncio.Semaphore(jobs)
-
-    async def sem_worker(url_):
-        async with sem:
-            await worker(url_)
-
     # ------------------------------------------------------------------ #
-    #  Run the batch in an *isolated* loop so we never interfere with    #
-    #  pytest‑asyncio's event‑loop lifecycle (fixes test_async_block).   #
+    #  Run the batch in a *private* loop **without** replacing the       #
+    #  currently‑running one (so pytest‑asyncio stays happy).            #
     # ------------------------------------------------------------------ #
-    _prev_loop = asyncio.get_event_loop_policy().get_event_loop()
-    loop = asyncio.new_event_loop()
-    asyncio.get_event_loop_policy().set_event_loop(loop)
-    
-    try:
-        tasks = [sem_worker(url) for url in urls]
-        loop.run_until_complete(asyncio.gather(*tasks))
-        typer.echo("🎉  Batch complete.")
-    finally:
-        loop.close()
-        asyncio.get_event_loop_policy().set_event_loop(_prev_loop)
+    def _runner() -> None:
+        async def _inner() -> None:
+            sem = asyncio.Semaphore(jobs)
+
+            async def sem_worker(url_: str) -> None:
+                async with sem:
+                    # Keep the tests that patch ``asyncio.to_thread`` happy
+                    def _call() -> None:
+                        # unwrap Typer sentinels
+                        def _plain(v):
+                            return v.default if isinstance(v, OptionInfo) else v
+
+                        from site_downloader.proxy import pool as proxy_pool
+                        _proxy_cycle = proxy_pool(_plain(proxy), _plain(proxies), _plain(proxy_file))
+
+                        from site_downloader import session as _sess
+                        jar: list[dict] | None = None
+                        if _plain(cookies_json):
+                            jar = json.loads(_plain(cookies_json))
+                        elif _plain(cookies_file):
+                            jar = _sess.load_cookie_file(_plain(cookies_file))
+
+                        _raw_block = _plain(block)
+                        _block_list = [t.strip().lower() for t in _raw_block.split(",")] if _raw_block else None
+
+                        _raw_css       = _plain(extra_css)
+                        _extra_css_list = (
+                            [p.strip() for p in _raw_css.split(",") if p.strip()]
+                            if _raw_css
+                            else None
+                        )
+
+                        _headers_json = _plain(headers)
+
+                        # run the asynchronous grab helper in this thread
+                        asyncio.run(
+                            grab_async(
+                                url_,
+                                fmt=_plain(fmt),
+                                engine=_plain(engine),
+                                proxy=next(_proxy_cycle),
+                                headers=_headers_json,
+                                dark_mode=_plain(dark_mode),
+                                viewport_width=_plain(viewport_width),
+                                quality=_plain(quality),
+                                ua_browser=_plain(ua_browser),
+                                ua_os=_plain(ua_os),
+                                cookies_json=_plain(cookies_json),
+                                cookies_file=_plain(cookies_file),
+                                extra_css=_extra_css_list,
+                                block=_block_list,
+                            )
+                        )
+
+                    await asyncio.to_thread(_call)
+
+            await asyncio.gather(*(sem_worker(u) for u in urls))
+
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(_inner())
+        finally:
+            loop.close()
+
+    _runner()
+    typer.echo("🎉  Batch complete.")
+
 
 # --------------------------------------------------------------------------- #
 # Compatibility: some callers (and one unit-test) expect `batch.callback`.
