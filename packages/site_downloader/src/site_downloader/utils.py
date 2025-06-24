@@ -20,7 +20,7 @@ def extract_url(text_or_url: str) -> str:
 
 import re, unicodedata
 
-def sanitize_url_for_filename(text: str) -> str:           # noqa: D401 – short
+def sanitize_url_for_filename(text: str) -> str:           # noqa: D401 - short
     """Return a filesystem-safe, *idempotent* ASCII slug."""
     ascii_txt = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
     ascii_txt = re.sub(r"^[A-Za-z]+://", "", ascii_txt)         # strip scheme

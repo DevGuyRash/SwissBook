@@ -15,7 +15,7 @@ async def test_async_block_wrapper(monkeypatch):
         await handler(_Route(), type("req", (), {"resource_type": "image"}))
         await handler(_Route(), type("req", (), {"resource_type": "document"}))
 
-    # Stub environment – we only care that *route* calls the handler
+    # Stub environment - we only care that *route* calls the handler
     monkeypatch.setattr("playwright.async_api.Page.route", _fake_route)
     monkeypatch.setattr("site_downloader.browser.async_playwright", None)  # trigger fallback stub
 

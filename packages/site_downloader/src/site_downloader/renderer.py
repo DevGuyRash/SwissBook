@@ -77,7 +77,7 @@ def render_page(
                 screen_path = out.with_suffix(".screen.pdf")
                 print_path  = out.with_suffix(".print.pdf")
 
-                # ––– screen render – try streaming first, fall back to file path –––
+                # --- screen render - try streaming first, fall back to file path ---
                 page.emulate_media(media="screen")
                 try:
                     data = page.pdf(
@@ -102,7 +102,7 @@ def render_page(
                         data if isinstance(data, (bytes, bytearray)) else data.encode()
                     )
 
-                # ––– print render – try streaming first, fall back to file path –––
+                # --- print render - try streaming first, fall back to file path ---
                 page.emulate_media(media="print")
                 try:
                     data = page.pdf(
@@ -131,7 +131,7 @@ def render_page(
             page.screenshot(path=str(fallback), full_page=True)
             return
 
-            # unreachable – all paths `return`
+            # unreachable - all paths `return`
     except Exception as exc:  # pragma: no cover
         raise RenderFailure(f"Could not render {url}: {exc}") from exc
 
@@ -145,7 +145,7 @@ async def render_page_async(*args, **kwargs):  # same signature; returns None
     extra = json.loads(headers_json) if headers_json else None
 
     cm = anew_page(
-        kwargs.get("engine", "chromium"),
+        kwargs.get("engine", "chromium"),  # type: ignore[arg-type]
         dark_mode=kwargs.get("dark_mode", False),
         scale=kwargs.get("scale", 2.0),
         proxy=kwargs.get("proxy"),

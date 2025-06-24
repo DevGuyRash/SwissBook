@@ -1,5 +1,5 @@
 """
-Async sibling of `cli.grab` – internal use by cli.batch.
+Async sibling of `cli.grab` - internal use by cli.batch.
 Only 'remote' code-paths are async-capable; local-file flows fall back to
 the original sync helpers transparently.
 """

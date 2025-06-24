@@ -11,7 +11,7 @@ import shutil
 import asyncio
 
 # --------------------------------------------------------------------------- #
-#  Async helper used by the internal ``_batch`` worker – imported lazily so   #
+#  Async helper used by the internal ``_batch`` worker - imported lazily so   #
 #  it is available both to the library *and* to tests that monkey-patch it.   #
 # --------------------------------------------------------------------------- #
 from site_downloader.batch_async import grab_async  # noqa: E402  (late import)
@@ -334,6 +334,26 @@ def batch(
         raise typer.Exit(code=1)
 
     urls = [line.strip() for line in file.read_text().splitlines() if line.strip()]
+    # ------------------------------------------------------------------ #
+    #  Nested‑loop safe‑guard - pytest‑asyncio (and Jupyter) sometimes   #
+    #  run tests inside an already‑running event‑loop.  In that case we  #
+    #  fall back to *synchronous* processing to avoid                    #
+    #  "Cannot run the event loop while another loop is running".        #
+    # ------------------------------------------------------------------ #
+    try:
+        running = asyncio.get_running_loop()
+    except RuntimeError:   # no loop in this thread
+        running = None
+
+    if running and running.is_running():
+        for u in urls:
+            grab(u, fmt=fmt, proxy=proxy, proxies=proxies, proxy_file=proxy_file,
+                 cookies_json=cookies_json, cookies_file=cookies_file,
+                 ua_browser=ua_browser, ua_os=ua_os,
+                 extra_css=extra_css, block=block)
+        typer.echo("🎉  Batch complete.")
+        return
+
     outdir = pathlib.Path("out")
     outdir.mkdir(exist_ok=True)
 

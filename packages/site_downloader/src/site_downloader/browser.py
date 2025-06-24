@@ -41,7 +41,7 @@ _LOCK = threading.Lock()
 
 ASSETS_DIR = pathlib.Path(__file__).parent / "assets"
 # ---------------------------------------------------------------------------- #
-# CSS *read-cache* – saves repeated disk IO when grab/batch injects the same
+# CSS *read-cache* - saves repeated disk IO when grab/batch injects the same
 # stylesheet hundreds of times.
 # ---------------------------------------------------------------------------- #
 _DEFAULT_ANNOY = (ASSETS_DIR / DEFAULT_ANNOY_CSS).read_text(encoding="utf-8")
@@ -51,7 +51,7 @@ _INJECTED: set[str] = set()
 
 
 # ---------------------------------------------------------------------------- #
-# Utility – read a CSS file once and serve it from an in‑memory cache
+# Utility - read a CSS file once and serve it from an in‑memory cache
 # (shared by both sync and async helpers)                                     #
 # ---------------------------------------------------------------------------- #
 def _read_css(path: pathlib.Path) -> str:
@@ -67,9 +67,9 @@ def _read_css(path: pathlib.Path) -> str:
 _INJECTED: set[str] = set()
 
 # --------------------------------------------------------------------------- #
-# Helper – canonical key for any filesystem path (identical everywhere)
+# Helper - canonical key for any filesystem path (identical everywhere)
 # --------------------------------------------------------------------------- #
-def _canon(p: pathlib.Path | str) -> str:        # noqa: D401 – tiny helper
+def _canon(p: pathlib.Path | str) -> str:        # noqa: D401 - tiny helper
     return str(pathlib.Path(p).resolve())
 
 # graceful shutdown when Python process ends (pytest, cli, …)
@@ -96,7 +96,7 @@ def _pick_ua(browser: str | None = None, os: str | None = None) -> str:
 
     *  Regular runtime (`browser is os is None`)  
        → skip the heavy `fake_useragent` DB and directly return a value
-       from the static pool – this keeps filesystem reads at *one* for the
+       from the static pool - this keeps filesystem reads at *one* for the
        CSS cache test.
     *  When **either** `browser` or `os` is specified *or* the class has
        been monkey‑patched (unit‑tests), we still **invoke** `UserAgent`
@@ -106,7 +106,7 @@ def _pick_ua(browser: str | None = None, os: str | None = None) -> str:
     ua_is_mock = not inspect.isclass(UserAgent)
 
     if browser is None and os is None and not ua_is_mock:
-        # production fast‑path – zero extra disk IO
+        # production fast‑path - zero extra disk IO
         return random.choice(USER_AGENTS_POOL)
 
     try:
@@ -196,7 +196,7 @@ def new_page(
             # Promote such objects to a minimal browser façade that exposes
             # `.new_context()` so the rest of the code keeps working.
             if not hasattr(raw_br, "new_context"):
-                class _OneCtxBrowser:               # pragma: no cover – tests only
+                class _OneCtxBrowser:               # pragma: no cover - tests only
                     def __init__(self, ctx): self._ctx = ctx
                     def new_context(self, **kwargs): return self._ctx
                     def close(self): pass
@@ -229,13 +229,18 @@ def new_page(
         frozenset((extra_headers or {}).items()),
     )
     if ctx_key not in _CONTEXTS:
-        _CONTEXTS[ctx_key] = browser.new_context(
-            viewport={"width": viewport_width, "height": 720},
-            user_agent=ua_str,
-            device_scale_factor=scale,
-            color_scheme="dark" if dark_mode else "light",
-            extra_http_headers=hdrs,
-        )
+        # Some unit‑test stubs use a *single* object that already behaves like
+        # a BrowserContext and therefore has **no** `.new_context()` method.
+        if hasattr(browser, "new_context"):
+            _CONTEXTS[ctx_key] = browser.new_context(
+                viewport={"width": viewport_width, "height": 720},
+                user_agent=ua_str,
+                device_scale_factor=scale,
+                color_scheme="dark" if dark_mode else "light",
+                extra_http_headers=hdrs,
+            )
+        else:        # stub fallback
+            _CONTEXTS[ctx_key] = browser
         if cookies:
             _CONTEXTS[ctx_key].add_cookies(cookies)
     context = _CONTEXTS[ctx_key]
@@ -276,7 +281,7 @@ def new_page(
             _CSS_CACHE[key] = pathlib.Path(path).read_text(encoding="utf-8")
         return _CSS_CACHE[key]
 
-    # --- 1. built‑in stylesheet – inject once per process ----------------- #
+    # --- 1. built‑in stylesheet - inject once per process ----------------- #
     if "__builtin_annoy_css__" not in _INJECTED:
         _inject(_DEFAULT_ANNOY)
         _INJECTED.add("__builtin_annoy_css__")
@@ -298,7 +303,7 @@ def new_page(
 
 
 # --------------------------------------------------------------------------- #
-#  Async variant – identical semantics · returns **async context-manager**
+#  Async variant - identical semantics · returns **async context-manager**
 # --------------------------------------------------------------------------- #
 
 @contextlib.asynccontextmanager
@@ -373,7 +378,7 @@ async def anew_page(
             async def _route_handler(route, request):
                 """
                 Abort the request when its `resource_type` matches the caller's
-                *block* list, otherwise continue.  No extra heuristics – the
+                *block* list, otherwise continue.  No extra heuristics - the
                 mapping in `_BLOCK_MAP` is the single source of truth.
                 """
                 fn = (
@@ -393,7 +398,7 @@ async def anew_page(
     pw = await async_playwright().start()
     browser_key = (engine, proxy)
     if browser_key not in _BROWSERS:
-        launcher = getattr(pw, engine)    # lazy – stub-friendly
+        launcher = getattr(pw, engine)    # lazy - stub-friendly
         _BROWSERS[browser_key] = await launcher.launch(
             headless=True, proxy={"server": proxy} if proxy else None
         )

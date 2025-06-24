@@ -51,7 +51,7 @@ class _ContextPool:
     @asynccontextmanager
     async def page(self) -> Page:
         if self._queue is None:
-            raise RuntimeError("Pool not started – call await start() first")
+            raise RuntimeError("Pool not started - call await start() first")
         ctx = await self._queue.get()
         try:
             page = await ctx.new_page()
