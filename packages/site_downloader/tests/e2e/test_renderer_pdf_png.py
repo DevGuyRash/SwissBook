@@ -28,12 +28,21 @@ def test_render_formats(tmp_path: pathlib.Path, engine: str, fmt: str):
     try:
         render_page("https://example.com", out, engine=engine)
     except RenderFailure as exc:
-        # WebKit (or any other engine) may be unavailable on the host -
-        # Playwright surfaces this as a launch-time "missing dependencies" error.
         msg = str(exc).lower()
-        if "missing dependencies" in msg or "executable" in msg:
-            hint = "Try:  python -m playwright install --with-deps"
-            pytest.skip(f"{engine} engine not available on this host - {hint}")
+        missing = (
+            "missing dependencies",
+            "libicu",
+            "libxml2",
+            "libwebp",
+            "error while loading shared libraries",
+            "executable doesn't exist",
+        )
+        if any(k in msg for k in missing):
+            hint = (
+                "WebKit not available – install native deps with:\n"
+                "   python -m playwright install --with-deps"
+            )
+            pytest.skip(hint)
         raise
 
     if fmt == "pdf":
