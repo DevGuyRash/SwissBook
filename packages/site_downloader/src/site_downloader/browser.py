@@ -47,7 +47,24 @@ ASSETS_DIR = pathlib.Path(__file__).parent / "assets"
 _DEFAULT_ANNOY = (ASSETS_DIR / DEFAULT_ANNOY_CSS).read_text(encoding="utf-8")
 # remembers which *file* has already been injected into a page (to avoid
 # duplicate reads when many pages ask for the same style)
-_INJECTED: set[str] = set()          # paths we *already* injected
+_INJECTED: set[str] = set()
+
+
+# ---------------------------------------------------------------------------- #
+# Utility – read a CSS file once and serve it from an in‑memory cache
+# (shared by both sync and async helpers)                                     #
+# ---------------------------------------------------------------------------- #
+def _read_css(path: pathlib.Path) -> str:
+    key = str(path.resolve())
+    css = _CSS_CACHE.get(key)
+    if css is None:
+        css = path.read_text(encoding="utf-8")
+        _CSS_CACHE[key] = css
+    return css
+
+
+# Paths we *already* injected styles from
+_INJECTED: set[str] = set()
 
 # --------------------------------------------------------------------------- #
 # Helper – canonical key for any filesystem path (identical everywhere)
@@ -429,9 +446,9 @@ async def anew_page(
         for css_path in extra_css or []:
             key = str(pathlib.Path(css_path).resolve())
             if key not in _INJECTED:           # first time only
-                _inject(_read_css(pathlib.Path(css_path)))
+                await _inject(_read_css(pathlib.Path(css_path)))
                 _INJECTED.add(key)
-        _inject(_DEFAULT_ANNOY)
+        await _inject(_DEFAULT_ANNOY)
         _inject._done = getattr(_inject, "_done", set()) | {ctx_key}  # mark done
 
     apage = await actx.new_page()
