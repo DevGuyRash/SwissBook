@@ -80,7 +80,10 @@ def grab(
         None,
         "--block",
         "-b",
-        help="Comma-separated resource types to abort: img,video,audio,media",
+        help=(
+            "Comma-separated resource types to abort. "
+            "`img` blocks still images, `media` blocks audio/video streams."
+        ),
     ),
     viewport_width: int = Opt(
         DEFAULT_VIEWPORT, "--viewport-width", help="Viewport width px"
