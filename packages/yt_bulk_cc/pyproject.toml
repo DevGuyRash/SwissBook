@@ -1,6 +1,6 @@
 [project]
-name = "bin"
-version = "0.1.0"
+name = "yt-bulk-cc"
+version = "1.0.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -17,3 +17,16 @@ dependencies = [
     "uvloop>=0.21.0",
     "youtube-transcript-api>=1.1.0",
 ]
+
+[project.scripts]
+yt-bulk-cc = "yt_bulk_cc.yt_bulk_cc:main"
+
+[build-system]
+requires = ["uv", "setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
