@@ -1,0 +1,12 @@
+FROM alpine:3.20
+RUN apk add --no-cache pulseaudio bash bats \
+ && adduser -D -u 1000 -h /home/test test \
+ && mkdir -p /run/user/1000 \
+ && chown test:test /run/user/1000
+
+ENV XDG_RUNTIME_DIR=/run/user/1000
+USER test
+
+COPY src/ec_toggle/ec-toggle /usr/local/bin/
+COPY tests/11_int_pa.bats /tests/
+ENTRYPOINT ["bats", "/tests/11_int_pa.bats"]
