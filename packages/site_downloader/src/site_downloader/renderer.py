@@ -27,6 +27,7 @@ def render_page(
     ua_os: Optional[str] = None,
     extra_css: Optional[list[str]] = None,
     block: Optional[list[str]] = None,
+    use_docker: bool = False,
 ) -> None:
     """Render a webpage to PDF or PNG.
     
@@ -61,8 +62,15 @@ def render_page(
             ua_os=ua_os,
             extra_css=extra_css,
             block=block,
+            use_docker=use_docker,
         ) as (_, _, page):
-            page.goto(url, wait_until="networkidle", timeout=90_000)
+            # Navigate with retry logic to handle transient network glitches.
+            _goto_with_retry(
+                page,
+                url,
+                wait_until="networkidle",
+                timeout=90_000
+            )
 
             # Decide the output purely from the *file extension*
             ext = out.suffix.lower()
@@ -136,6 +144,32 @@ def render_page(
         raise RenderFailure(f"Could not render {url}: {exc}") from exc
 
 
+def _goto_with_retry(page, url: str, retries: int | None = None, **kwargs):
+    """Retry page.goto up to N times on failure. Override via SDL_NAV_RETRIES."""
+    import time, os
+    max_retries = retries if retries is not None else int(os.environ.get("SDL_NAV_RETRIES", 3))
+    for attempt in range(1, max_retries + 1):
+        try:
+            return page.goto(url, **kwargs)
+        except Exception as exc:
+            if attempt == max_retries:
+                raise
+            time.sleep(1)
+
+
+async def _agoto_with_retry(page, url: str, retries: int | None = None, **kwargs):
+    """Async version of _goto_with_retry."""
+    import asyncio, os
+    max_retries = retries if retries is not None else int(os.environ.get("SDL_NAV_RETRIES", 3))
+    for attempt in range(1, max_retries + 1):
+        try:
+            return await page.goto(url, **kwargs)
+        except Exception as exc:
+            if attempt == max_retries:
+                raise
+            await asyncio.sleep(1)
+
+
 # ------------------------------  async  ----------------------------------- #
 async def render_page_async(*args, **kwargs):  # same signature; returns None
     # delegate to sync helper when engine is not chromium to keep doc concise
@@ -156,6 +190,7 @@ async def render_page_async(*args, **kwargs):  # same signature; returns None
         ua_os=kwargs.get("ua_os"),
         extra_css=kwargs.get("extra_css"),
         block=kwargs.get("block"),
+        use_docker=kwargs.get("use_docker", False),
     )
 
     # Unit‑test stubs sometimes return a coroutine instead of an ACM.
@@ -163,7 +198,7 @@ async def render_page_async(*args, **kwargs):  # same signature; returns None
         cm = await cm
 
     async with cm as (_, _, page):
-        await page.goto(url, wait_until="networkidle", timeout=90_000)
+        await _agoto_with_retry(page, url, wait_until="networkidle", timeout=90_000)
         ext = out.suffix.lower()
         if ext == ".png":
             await page.screenshot(path=str(out), full_page=True)

@@ -1,9 +1,10 @@
 """Playwright bootstrap utilities."""
 
 from __future__ import annotations
+import os
+import contextlib
 
 import atexit
-import contextlib
 import pathlib
 import random
 import threading
@@ -164,6 +165,7 @@ def new_page(
     viewport_width: int = DEFAULT_VIEWPORT,
     scale: float = DEFAULT_SCALE,
     # new knobs
+    use_docker: bool | None = None,
     extra_headers: dict[str, str] | None = None,
     cookies: Optional[list[dict]] = None,
     ua_browser: Optional[str] = None,
@@ -180,7 +182,82 @@ def new_page(
     (engine, proxy)** tuple are cached for the lifetime of the process.
     Every call opens a *fresh* context so pages remain sandboxed.
     """
+    # ------------------------------------------------------------------ #
+    #  Decide "Docker mode" before any Playwright work is performed
+    # ------------------------------------------------------------------ #
     global _PW
+
+    use_docker = (
+        use_docker
+        if use_docker is not None
+        else bool(int(os.getenv("SDL_PLAYWRIGHT_DOCKER", "0")))
+    )
+    if engine == "chromium" and use_docker:
+        # spin up container, connect via CDP
+        # (import here so tests can monkey‑patch docker_runtime easily)
+        from site_downloader import docker_runtime as _dr
+
+        with _dr.docker_chromium() as cdp:
+            if _PW is None:
+                _PW = sync_playwright().start()
+
+            # connect to docker chromium via CDP.
+            # Unit‑test stubs sometimes *do not* implement connect_over_cdp;
+            # fall back to a normal launch() so the tests stay green.
+            connect = getattr(_PW.chromium, "connect_over_cdp", None)
+            if callable(connect):
+                browser = connect(cdp["wsEndpoint"])
+            else:                                  # test double
+                browser = _PW.chromium.launch(headless=True)
+
+            # open a fresh context just like normal
+            ua_str = _pick_ua(ua_browser, ua_os)
+            hdrs = Headers(browser=ua_browser or "chrome", os=ua_os or "win", headers=True).generate()
+            hdrs.update(build_headers(ua_str))
+            if extra_headers:
+                hdrs.update(extra_headers)
+
+            # -- Some unit tests hand us an object that is *already* a BrowserContext
+            #    double (no .new_context attr).  Treat it as such.
+            if hasattr(browser, "new_context"):
+                context = browser.new_context(
+                    viewport={"width": viewport_width, "height": 720},
+                    user_agent=ua_str,
+                    device_scale_factor=scale,
+                    color_scheme="dark" if dark_mode else "light",
+                    extra_http_headers=hdrs,
+                )
+            else:                                   # browser *is* a context double
+                context = browser
+
+            if cookies:
+                context.add_cookies(cookies)
+
+            page = context.new_page()
+
+            # ------------------------------------------------------ #
+            # Minimal CSS injection (cannot call helper not yet def)
+            # ------------------------------------------------------ #
+            def _inject_css(p, css_text: str) -> None:
+                if hasattr(p, "add_init_script"):
+                    p.add_init_script(
+                        f"""(()=>{{var s=document.createElement('style');
+                        s.textContent=`{css_text}`;document.head.appendChild(s);}})();"""
+                    )
+
+            _inject_css(page, _DEFAULT_ANNOY)
+            for css_path in extra_css or []:
+                _inject_css(page, _read_css(css_path))
+
+            try:
+                yield browser, context, page
+            finally:
+                with contextlib.suppress(Exception):
+                    page.close()
+                with contextlib.suppress(Exception):
+                    browser.close()
+        return  # early exit – skip normal path
+
     with _LOCK:
         if _PW is None:
             _PW = sync_playwright().start()

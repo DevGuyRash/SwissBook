@@ -93,6 +93,18 @@ python -m yt_bulk_cc.yt_bulk_cc "https://www.youtube.com/@CrashCourse/videos" -f
 
 > See the script's built-in help for all options: `python -m yt_bulk_cc.yt_bulk_cc --help`
 
+## Installation
+
+### Running with the Playwright Docker image
+
+>If you'd rather avoid installing ~1 GB of browser binaries locally, you can
+>run *sdl* in a container:
+>
+>```bash
+>pip install "site_downloader[docker]"
+>SDL_PLAYWRIGHT_DOCKER=1 sdl grab https://example.com -f pdf
+>```
+
 ---
 
 ## ✍️ Adding a new tool

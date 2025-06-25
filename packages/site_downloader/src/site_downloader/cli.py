@@ -50,7 +50,7 @@ def _unwrap(value: Any) -> Any:                       # pragma: no cover
 @app.command()
 def grab(
     url: str = Arg(..., help="URL *or* local file"),
-    fmt: str = Opt("html", "--format", "-f", help="/".join(sorted(VALID_FORMATS))),
+    fmt: Optional[str] = Opt(None, "--format", "-f", help="/".join(sorted(VALID_FORMATS))),
     out: pathlib.Path = Opt(None, "--out", "-o", help="Output path"),
     # browser / network
     engine: str = Opt("chromium", "--engine", "-e", help="chromium | firefox | webkit"),
@@ -107,6 +107,11 @@ def grab(
         "--fast-http/--no-fast-http",
         help="Fetch HTML via vanilla HTTP instead of Playwright when possible",
     ),
+    use_docker: bool = Opt(
+        False,
+        "--docker",
+        help="Run inside the official Playwright container (auto‑ports)",
+    ),
 ) -> None:
     """
     Unified command - determines workflow solely by **--format**.
@@ -124,6 +129,13 @@ def grab(
     _out_raw = _unwrap(out)          # None when OptionInfo or explicit None
     out = pathlib.Path(_out_raw) if _out_raw is not None else None
 
+    # Default → infer from the output suffix; fall back to html
+    if not fmt:
+        if out:
+            fmt = (out.suffix.lstrip(".") or "html").lower()
+        else:
+            fmt = "html"
+
     engine         = _unwrap(engine)
     proxy          = _unwrap(proxy)
     proxies        = _unwrap(proxies)
@@ -136,6 +148,7 @@ def grab(
     selector       = _unwrap(selector)
     no_scroll      = bool(_unwrap(no_scroll))
     max_scrolls    = int(_unwrap(max_scrolls))
+    use_docker     = bool(_unwrap(use_docker))
     ua_browser     = _unwrap(ua_browser)
     ua_os          = _unwrap(ua_os)
     cookies_json   = _unwrap(cookies_json)
@@ -172,7 +185,6 @@ def grab(
     # Ensure headers reach the fetcher even when grab() is called directly
     headers_json = headers if isinstance(headers, str) else None
 
-    fmt = fmt.lower()
     if fmt not in VALID_FORMATS:
         secho(f"❌  Unknown format: {fmt}", fg=colors.RED, err=True)
         raise Exit(1)
@@ -214,6 +226,7 @@ def grab(
             ua_os=ua_os,
             extra_css=extra_css,
             block=block,
+            use_docker=use_docker,
         )
         typer.echo(f"✅  Saved {out}")
         return
