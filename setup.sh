@@ -99,6 +99,8 @@ done
 if [[ -n "$PROJ_ROOT" ]]; then
   cd "$PROJ_ROOT"
   CMD=(uv sync)
+  # always target the already-activated venv, not a local .venv
+  CMD+=(--active)
   # if it *is* the actual repo root, install the whole workspace
   if [[ "$PROJ_ROOT" == "$REPO_ROOT" ]] && \
      grep -qE '^\s*\[(workspace|tool\.poetry\.workspace)' pyproject.toml; then
