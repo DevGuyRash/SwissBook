@@ -83,10 +83,27 @@ fi
 # shellcheck source=/dev/null
 [[ -d .venv ]] && source .venv/bin/activate || true
 
-# ------------------- Fast-path uv sync if project root ------------------
-if [[ -f pyproject.toml ]]; then
+# ---------------- detect any project root (including inside packages) ----------------
+# Look from INVOKED_FROM up to REPO_ROOT for pyproject.toml
+SEARCH="$INVOKED_FROM"
+PROJ_ROOT=""
+while [[ "$SEARCH" != "$(dirname "$REPO_ROOT")" && "$SEARCH" != "/" ]]; do
+  if [[ -f "$SEARCH/pyproject.toml" ]]; then
+    PROJ_ROOT="$SEARCH"
+    break
+  fi
+  SEARCH="$(dirname "$SEARCH")"
+done
+
+# Fast-path: run uv sync inside that project
+if [[ -n "$PROJ_ROOT" ]]; then
+  cd "$PROJ_ROOT"
   CMD=(uv sync)
-  grep -qE '^\s*\[(workspace|tool\.poetry\.workspace)' pyproject.toml && CMD+=(--all-packages)
+  # if it *is* the actual repo root, install the whole workspace
+  if [[ "$PROJ_ROOT" == "$REPO_ROOT" ]] && \
+     grep -qE '^\s*\[(workspace|tool\.poetry\.workspace)' pyproject.toml; then
+    CMD+=(--all-packages)
+  fi
   (( DEV )) && CMD+=(--dev) || CMD+=(--no-dev)
   (( PROD )) && CMD+=(--no-dev --no-editable)
   (( ALL_EXTRAS )) && CMD+=(--all-extras)
