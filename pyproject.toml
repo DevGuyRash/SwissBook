@@ -1,0 +1,30 @@
+# SwissBook/pyproject.toml
+
+[project]
+name = "swissbook-workspace"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+# Centralize shared development dependencies for all packages in the workspace.
+# When you run `setup.sh --dev`, uv will install these.
+[project.optional-dependencies]
+dev = [
+  "ruff",
+  "black",
+  "pytest>=8.4",
+  "pytest-asyncio>=0.23",
+  "pytest-cov>=6.2",
+  "pytest-xdist>=3.7",
+  "pytest-playwright>=0.5",
+  "hypothesis>=6.99",
+  "pandocfilters ; platform_system != 'Windows'",
+  "docker>=7.0"
+]
+
+# Define the workspace members for uv.
+# This tells uv where to find the individual packages.
+[tool.uv.workspace]
+members = [
+    "packages/site_downloader",
+    "packages/yt_bulk_cc"
+]

@@ -20,21 +20,6 @@ dependencies = [
   "aiofiles>=24.1.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-  # tests / lint / typing
-  "pytest>=8.4",
-  "pytest-asyncio>=0.23",
-  "pytest-cov>=6.2",
-  "pytest-xdist>=3.7",
-  "pytest-playwright>=0.5",
-  "hypothesis>=6.99",
-  "ruff",
-  "black",
-  "pandocfilters ; platform_system != 'Windows'",
-]
-docker = [ "docker>=7.0" ]
-
 [tool.setuptools]
 package-dir = { "" = "src" }
 

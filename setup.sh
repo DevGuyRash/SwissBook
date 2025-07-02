@@ -108,7 +108,7 @@ if [[ -n "$PROJ_ROOT" ]]; then
   CMD+=(--active)
   # if it *is* the actual repo root, install the whole workspace
   if [[ "$PROJ_ROOT" == "$REPO_ROOT" ]] && \
-     grep -qE '^\s*\[(workspace|tool\.poetry\.workspace)' pyproject.toml; then
+     grep -qE '^\s*\[(workspace|tool\..*\.workspace)]' pyproject.toml; then
     CMD+=(--all-packages)
   fi
   (( DEV )) && CMD+=(--dev) || CMD+=(--no-dev)
