@@ -552,7 +552,7 @@ class ColorFormatter(logging.Formatter):
         return super().format(rec)
 
 
-async def main() -> None:
+async def _main() -> None:
     # custom help formatter
     class _ManFmt(argparse.ArgumentDefaultsHelpFormatter,
                   argparse.RawTextHelpFormatter):
@@ -1170,8 +1170,7 @@ async def main() -> None:
         sys.exit(2)
 
 
-# ────────────────────────── bootstrap ────────────────────────────────
-if __name__ == "__main__":
+def main():
     if sys.platform.startswith("linux"):
         with contextlib.suppress(ModuleNotFoundError):
             import uvloop; uvloop.install()
@@ -1180,8 +1179,13 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, _sigint)
 
     try:
-        asyncio.run(main())
+        asyncio.run(_main())
     except KeyboardInterrupt:
         logging.warning("Interrupted by user")
         print(f"\n{C.BLU}Aborted by user{C.END}")
         sys.exit(130)
+
+
+# ────────────────────────── bootstrap ────────────────────────────────
+if __name__ == "__main__":
+    main()
