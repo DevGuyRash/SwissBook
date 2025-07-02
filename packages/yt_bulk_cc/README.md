@@ -47,10 +47,27 @@ python -m yt_bulk_cc.yt_bulk_cc "https://youtu.be/dQw4w9WgXcQ" -f srt
 # 2. Download an entire playlist as individual JSON files
 python -m yt_bulk_cc.yt_bulk_cc "https://youtube.com/playlist?list=PLxyz123" -f json
 
-# 3. Concatenate all transcripts from a channel into a single text file
-python -m yt_bulk_cc.yt_bulk_cc "https://www.youtube.com/@CrashCourse/videos" -f text --concat channel_output
+# 3. Download all transcripts from a channel using its handle
+python -m yt_bulk_cc.yt_bulk_cc "https://www.youtube.com/@Recipe4Porkchops"
+```
 
-# 4. Convert an existing directory of JSON files to SRT
+The command produces a detailed summary and lists files that were successfully downloaded or skipped.
+
+![Example Run](assets/yt_bulk_cc-example_01.png)
+
+To combine these downloaded files, you can run the same command with the `--concat` flag. The script will find the existing files, skip the download process, and create a single combined file.
+
+```bash
+# 4. Concatenate the transcripts from the previous step
+python -m yt_bulk_cc.yt_bulk_cc "https://www.youtube.com/@Recipe4Porkchops" --concat
+```
+![Example Concatenation Run](assets/yt_bulk_cc-example_02.png)
+
+```bash
+# 5. Concatenate all transcripts from a different channel into a single text file
+python -m yt_bulk_cc.yt_bulk_cc "https://www.youtube.com/@CrashCourse" -f text --concat channel_output
+
+# 6. Convert an existing directory of JSON files to SRT
 python -m yt_bulk_cc.yt_bulk_cc --convert ./out -f srt -o ./out_srt
 ```
 
