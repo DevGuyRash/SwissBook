@@ -1,4 +1,0 @@
-FROM alpine:3.20
-RUN apk add --no-cache pulseaudio pulseaudio-utils bash bats
-COPY ec-toggle /usr/local/bin/
-ENTRYPOINT ["bats", "/tests/11_int_pa.bats"]
