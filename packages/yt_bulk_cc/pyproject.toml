@@ -1,7 +1,7 @@
 [project]
-name = "ybc"
+name = "yt_bulk_cc"
 version = "1.0.0"
-description = "Add your description here"
+description = "Bulk download YouTube transcripts"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
