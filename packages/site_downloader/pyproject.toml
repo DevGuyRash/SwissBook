@@ -17,6 +17,7 @@ dependencies = [
   "markitdown>=0.1.2",
   "fake-useragent>=2.2",
   "fake-headers>=1.0",
+  "aiofiles>=24.1.0",
 ]
 
 [project.optional-dependencies]

@@ -6,14 +6,15 @@ import site_downloader.browser as br
 def make_stubs():
     class _Page:
         def __init__(self):
-            self.routes = []
+            self._route_calls = []
         def route(self, pattern, handler):
-            self.routes.append(pattern)
+            self._route_calls.append(pattern)
         # required noop methods
         def add_init_script(self, *a, **kw): ...
     class _Ctx:
         def __init__(self): self.page = _Page()
         def new_page(self): return self.page
+        def add_cookies(self, *a, **kw): ...
         def close(self): ...
     class _Browser:
         def new_context(self, **kw): return _Ctx()
@@ -30,5 +31,5 @@ def test_route_added(monkeypatch):
     with br.new_page(block_assets=True) as (_, context, page):
         pass
     # our stub stored the pattern
-    assert page.routes == ["**/*"] 
+    assert page._route_calls == ["**/*"] 
 

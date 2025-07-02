@@ -48,6 +48,11 @@ EOF
   shift
 done
 
+# If the caller used --dev and didn't override extras, pull *all* extras.
+if [[ $DEV -eq 1 && $ALL_EXTRAS -eq 0 && ${#EXTRAS[@]} -eq 0 ]]; then
+  ALL_EXTRAS=1
+fi
+
 if [[ $DEV -eq 1 && $PROD -eq 1 ]]; then
   echo "❌  --dev and --prod are mutually exclusive" >&2
   exit 1
@@ -108,6 +113,7 @@ if [[ -n "$PROJ_ROOT" ]]; then
   fi
   (( DEV )) && CMD+=(--dev) || CMD+=(--no-dev)
   (( PROD )) && CMD+=(--no-dev --no-editable)
+  # FIXED: Removed the duplicated line that added --all-extras twice.
   (( ALL_EXTRAS )) && CMD+=(--all-extras)
   for ex in "${EXTRAS[@]}"; do CMD+=(--extra "$ex"); done
   echo "🚀  ${CMD[*]}"
@@ -157,7 +163,17 @@ for pkg_path in "${PKGS[@]}"; do
   fi
 
   if [[ $DEV -eq 1 ]]; then
-    if (( ALL_EXTRAS )) && has_extras "$pkg_path"; then
+    # Prefer uv sync if this package has its own lock file
+    if [[ -f "$pkg_path/uv.lock" ]]; then
+      echo "  • $(basename "$pkg_path")  [uv sync + dev + extras]"
+      if [[ $DRY_RUN -eq 0 ]]; then
+        (
+          cd "$pkg_path"
+          uv sync --active --dev ${ALL_EXTRAS:+--all-extras} \
+                  $(printf -- '--extra %s ' "${EXTRAS[@]}")
+        )
+      fi
+    elif (( ALL_EXTRAS )) && has_extras "$pkg_path"; then
       echo "  • $spec  [editable + all extras]"
       [[ $DRY_RUN -eq 0 ]] && uv pip install -e "$pkg_path" --all-extras
     else
@@ -170,9 +186,13 @@ for pkg_path in "${PKGS[@]}"; do
     [[ $DRY_RUN -eq 0 ]] && uv pip install "$pkg_path"
 
   else
-    echo "  • $spec  [editable]"
-    [[ $DRY_RUN -eq 0 ]] && uv pip install -e "$spec"
-
+    if (( ALL_EXTRAS )) && has_extras "$pkg_path"; then
+      echo "  • $spec  [editable + all extras]"
+      [[ $DRY_RUN -eq 0 ]] && uv pip install -e "$pkg_path" --all-extras
+    else
+      echo "  • $spec  [editable]"
+      [[ $DRY_RUN -eq 0 ]] && uv pip install -e "$spec"
+    fi
   fi
 done
 

@@ -64,9 +64,13 @@ def test_docker_branch(monkeypatch):
         def launch(self, *, headless: bool = True):
             return _Br()
 
-    monkeypatch.setattr(
-        br, "sync_playwright", lambda: types.SimpleNamespace(start=lambda: _PW())
-    )
+    # Mock the playwright import at the module level
+    mock_pw_instance = _PW()
+    mock_pw_manager = types.SimpleNamespace(start=lambda: mock_pw_instance)
+    monkeypatch.setattr(br, "sync_playwright", lambda: mock_pw_manager)
+    
+    # Also mock the specific playwright object that gets created
+    monkeypatch.setattr("playwright.sync_api.sync_playwright", lambda: mock_pw_manager)
 
     with br.new_page(use_docker=True) as (_b, _c, page):
         # Smoke assertion: page exists and env var triggered branch
