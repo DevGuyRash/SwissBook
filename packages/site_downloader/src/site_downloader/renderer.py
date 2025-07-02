@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import json
 import pathlib
 import urllib.parse
@@ -26,6 +27,7 @@ def render_page(
     ua_os: Optional[str] = None,
     extra_css: Optional[list[str]] = None,
     block: Optional[list[str]] = None,
+    use_docker: bool = False,
 ) -> None:
     """Render a webpage to PDF or PNG.
     
@@ -60,77 +62,112 @@ def render_page(
             ua_os=ua_os,
             extra_css=extra_css,
             block=block,
+            use_docker=use_docker,
         ) as (_, _, page):
-            page.goto(url, wait_until="networkidle", timeout=90_000)
+            # Navigate with retry logic to handle transient network glitches.
+            _goto_with_retry(
+                page,
+                url,
+                wait_until="networkidle",
+                timeout=90_000
+            )
 
-        # Decide the output purely from the *file extension* so users can ask
-        # for PNG even when they keep the default `chromium` engine.
-        ext = out.suffix.lower()
+            # Decide the output purely from the *file extension*
+            ext = out.suffix.lower()
 
-        # -- PNG ----------------------------------------------------------------
-        if ext == ".png":
-            page.screenshot(path=str(out), full_page=True)
+            # -- PNG ------------------------------------------------------------
+            if ext == ".png":
+                page.screenshot(path=str(out), full_page=True)
+                return
+
+            # -- PDF (dual‑render, Chromium‑only) -------------------------------
+            if ext == ".pdf" and engine == "chromium":
+                screen_path = out.with_suffix(".screen.pdf")
+                print_path  = out.with_suffix(".print.pdf")
+
+                # --- screen render - try streaming first, fall back to file path ---
+                page.emulate_media(media="screen")
+                try:
+                    data = page.pdf(
+                        format="A4",
+                        print_background=True,
+                        scale=scale,
+                        path=None,           # used by *streaming_writer* test
+                    )
+                except Exception:            # stub requires explicit file path
+                    page.pdf(
+                        format="A4",
+                        print_background=True,
+                        scale=scale,
+                        path=str(screen_path),
+                    )
+                    data = b""
+
+                if data is None:
+                    data = b""
+                if data:
+                    screen_path.write_bytes(
+                        data if isinstance(data, (bytes, bytearray)) else data.encode()
+                    )
+
+                # --- print render - try streaming first, fall back to file path ---
+                page.emulate_media(media="print")
+                try:
+                    data = page.pdf(
+                        format="A4",
+                        print_background=True,
+                        path=None,
+                    )
+                except Exception:
+                    page.pdf(
+                        format="A4",
+                        print_background=True,
+                        path=str(print_path),
+                    )
+                    data = b""
+
+                if data is None:
+                    data = b""
+                if data:
+                    print_path.write_bytes(
+                        data if isinstance(data, (bytes, bytearray)) else data.encode()
+                    )
+                return
+
+            # -- Fallback (non‑Chromium engines) --------------------------------
+            fallback = out if ext == ".png" else out.with_suffix(".png")
+            page.screenshot(path=str(fallback), full_page=True)
             return
 
-        # -- PDF (dual-render, Chromium-only) -----------------------------------
-        if ext == ".pdf" and engine == "chromium":
-            screen_path = out.with_suffix(".screen.pdf")
-            print_path  = out.with_suffix(".print.pdf")
-
-            # --- screen render - try streaming first, fall back to file path ---
-            page.emulate_media(media="screen")
-            try:
-                data = page.pdf(
-                    format="A4",
-                    print_background=True,
-                    scale=scale,
-                    path=None,           # used by *streaming_writer* test
-                )
-            except Exception:            # stub requires explicit file path
-                page.pdf(
-                    format="A4",
-                    print_background=True,
-                    scale=scale,
-                    path=str(screen_path),
-                )
-                data = b""
-
-            if data is None:
-                data = b""
-            if data:
-                screen_path.write_bytes(
-                    data if isinstance(data, (bytes, bytearray)) else data.encode()
-                )
-
-            # --- print render - try streaming first, fall back to file path ---
-            page.emulate_media(media="print")
-            try:
-                data = page.pdf(
-                    format="A4",
-                    print_background=True,
-                    path=None,
-                )
-            except Exception:
-                page.pdf(
-                    format="A4",
-                    print_background=True,
-                    path=str(print_path),
-                )
-                data = b""
-
-            if data is None:
-                data = b""
-            if data:
-                print_path.write_bytes(
-                    data if isinstance(data, (bytes, bytearray)) else data.encode()
-                )
-            return
-
-        # -- Fallback (non-Chromium engines don't support page.pdf) -------------
-        fallback = out if ext == ".png" else out.with_suffix(".png")
-        page.screenshot(path=str(fallback), full_page=True)
+            # unreachable - all paths `return`
     except Exception as exc:  # pragma: no cover
         raise RenderFailure(f"Could not render {url}: {exc}") from exc
+
+
+def _goto_with_retry(page, url: str, retries: int | None = None, **kwargs):
+    """Retry page.goto up to N times on failure. Override via SDL_NAV_RETRIES."""
+    import time, os
+    max_retries = retries if retries is not None else int(os.environ.get("SDL_NAV_RETRIES", 3))
+    for attempt in range(1, max_retries + 1):
+        try:
+            return page.goto(url, **kwargs)
+        except Exception as exc:
+            if attempt == max_retries:
+                raise
+            time.sleep(1)
+
+
+async def _agoto_with_retry(page, url: str, retries: int | None = None, **kwargs):
+    """Async version of _goto_with_retry."""
+    import asyncio, os
+    max_retries = retries if retries is not None else int(os.environ.get("SDL_NAV_RETRIES", 3))
+    for attempt in range(1, max_retries + 1):
+        try:
+            return await page.goto(url, **kwargs)
+        except Exception as exc:
+            if attempt == max_retries:
+                raise
+            await asyncio.sleep(1)
 
 
 # ------------------------------  async  ----------------------------------- #
@@ -141,8 +178,8 @@ async def render_page_async(*args, **kwargs):  # same signature; returns None
     headers_json = kwargs.get("headers_json")
     extra = json.loads(headers_json) if headers_json else None
 
-    async with (await anew_page(
-        kwargs.get("engine", "chromium"),
+    cm = anew_page(
+        kwargs.get("engine", "chromium"),  # type: ignore[arg-type]
         dark_mode=kwargs.get("dark_mode", False),
         scale=kwargs.get("scale", 2.0),
         proxy=kwargs.get("proxy"),
@@ -153,8 +190,15 @@ async def render_page_async(*args, **kwargs):  # same signature; returns None
         ua_os=kwargs.get("ua_os"),
         extra_css=kwargs.get("extra_css"),
         block=kwargs.get("block"),
-    )) as (_, _, page):
-        await page.goto(url, wait_until="networkidle", timeout=90_000)
+        use_docker=kwargs.get("use_docker", False),
+    )
+
+    # Unit‑test stubs sometimes return a coroutine instead of an ACM.
+    if inspect.iscoroutine(cm):
+        cm = await cm
+
+    async with cm as (_, _, page):
+        await _agoto_with_retry(page, url, wait_until="networkidle", timeout=90_000)
         ext = out.suffix.lower()
         if ext == ".png":
             await page.screenshot(path=str(out), full_page=True)

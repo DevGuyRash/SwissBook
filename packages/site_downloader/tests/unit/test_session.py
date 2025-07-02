@@ -27,19 +27,16 @@ def test_load_cookie_file_not_exists(tmp_path):
     assert cookies == []
 
 @patch('site_downloader.session.sync_playwright')
-def test_interactive_login(mock_playwright, tmp_path):
+def test_interactive_login(mock_sync_playwright, tmp_path):
     """Test interactive login flow."""
     # Setup mocks
-    mock_pw = MagicMock()
-    mock_browser = MagicMock()
-    mock_context = MagicMock()
-    mock_page = MagicMock()
-    
-    # Configure the mock objects
-    mock_playwright.return_value = mock_pw
-    mock_pw.chromium.launch.return_value = mock_browser
-    mock_browser.new_context.return_value = mock_context
-    mock_context.new_page.return_value = mock_page
+    mock_pw_manager = MagicMock()
+    mock_pw = mock_pw_manager.__enter__.return_value
+    mock_sync_playwright.return_value = mock_pw_manager
+
+    mock_browser = mock_pw.chromium.launch.return_value
+    mock_context = mock_browser.new_context.return_value
+    mock_page = mock_context.new_page.return_value
     
     # Mock the cookies that would be returned
     test_cookies = [{"name": "session", "value": "abc123", "domain": "example.com"}]
@@ -60,6 +57,7 @@ def test_interactive_login(mock_playwright, tmp_path):
     assert saved_cookies == test_cookies
     
     # Verify the browser interactions
+    mock_pw.chromium.launch.assert_called_once_with(headless=False)
     mock_page.goto.assert_called_once_with("https://example.com/login")
     mock_browser.close.assert_called_once()
-    mock_playwright.return_value.stop.assert_called_once()
+    mock_pw_manager.__exit__.assert_called_once()

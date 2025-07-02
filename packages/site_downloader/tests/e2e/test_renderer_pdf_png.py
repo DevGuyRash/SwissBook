@@ -39,7 +39,7 @@ def test_render_formats(tmp_path: pathlib.Path, engine: str, fmt: str):
         )
         if any(k in msg for k in missing):
             hint = (
-                "WebKit not available - install native deps with:\n"
+                "WebKit not available – install native deps with:\n"
                 "   python -m playwright install --with-deps"
             )
             pytest.skip(hint)
