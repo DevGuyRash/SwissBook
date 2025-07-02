@@ -168,9 +168,15 @@ for pkg_path in "${PKGS[@]}"; do
       echo "  • $(basename "$pkg_path")  [uv sync + dev + extras]"
       if [[ $DRY_RUN -eq 0 ]]; then
         (
-          cd "$pkg_path"
-          uv sync --active --dev ${ALL_EXTRAS:+--all-extras} \
-                  $(printf -- '--extra %s ' "${EXTRAS[@]}")
+          cd "$pkg_path" || exit
+          CMD=(uv sync --active --dev)
+          if (( ALL_EXTRAS )); then
+            CMD+=(--all-extras)
+          fi
+          for ex in "${EXTRAS[@]}"; do
+            CMD+=(--extra "$ex")
+          done
+          "${CMD[@]}"
         )
       fi
     elif (( ALL_EXTRAS )) && has_extras "$pkg_path"; then

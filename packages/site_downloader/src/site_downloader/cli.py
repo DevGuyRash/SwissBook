@@ -31,7 +31,7 @@ from site_downloader.constants import (
     LIST_FILE_SUFFIXES,
 )
 
-app = typer.Typer(add_completion=False, help="Site Downloader CLI", no_args_is_help=True)
+app = typer.Typer(add_completion=False, help="A powerful CLI to download, clean, convert, and render web pages into various formats like PDF, PNG, or Markdown.", no_args_is_help=True)
 
 # --------------------------------------------------------------------------- #
 # Helper - unwrap Typer's sentinel objects when functions are invoked
@@ -49,46 +49,45 @@ def _unwrap(value: Any) -> Any:                       # pragma: no cover
 # --------------------------------------------------------------------------- #
 @app.command()
 def grab(
-    url: str = Arg(..., help="URL *or* local file"),
-    fmt: Optional[str] = Opt(None, "--format", "-f", help="/".join(sorted(VALID_FORMATS))),
-    out: pathlib.Path = Opt(None, "--out", "-o", help="Output path"),
+    url: str = Arg(..., help="The URL to grab or the path to a local file/list of URLs."),
+    fmt: Optional[str] = Opt(None, "--format", "-f", help=f"Output format. If omitted, it's inferred from the --out file extension. Defaults to 'html'. Choices: {', '.join(sorted(VALID_FORMATS))}"),
+    out: pathlib.Path = Opt(None, "--out", "-o", help="Path for the output file. If omitted, a name is generated from the URL and placed in the 'out/' directory."),
     # browser / network
-    engine: str = Opt("chromium", "--engine", "-e", help="chromium | firefox | webkit"),
-    proxy: Optional[str] = Opt(None, "--proxy", help="HTTP proxy, e.g. http://host:3128"),
-    proxies: Optional[str] = Opt(None, "--proxies", help="Comma-separated proxy list"),
+    engine: str = Opt("chromium", "--engine", "-e", help="Browser engine for rendering PDF/PNG. Choices: chromium, firefox, webkit."),
+    proxy: Optional[str] = Opt(None, "--proxy", help="Use a specific HTTP/S proxy. Example: http://user:pass@host:port"),
+    proxies: Optional[str] = Opt(None, "--proxies", help="Provide a comma-separated list of proxies to rotate through."),
     proxy_file: Optional[pathlib.Path] = Opt(
-        None, "--proxy-file", help="File containing proxies (1/line)"
+        None, "--proxy-file", help="Provide a file with one proxy per line to rotate through."
     ),
-    headers: Optional[str] = Opt(None, "--headers", help="Extra HTTP headers as JSON string"),
-    dark_mode: bool = Opt(False, "--dark-mode", help="prefers-color-scheme: dark"),
+    headers: Optional[str] = Opt(None, "--headers", help='Custom HTTP headers as a JSON string. Example: \'{"X-API-Key":"123"}\''),
+    dark_mode: bool = Opt(False, "--dark-mode", help="Request the page in dark mode (prefers-color-scheme: dark)."),
     # --- NEW - UA filters -------------------------------------------------- #
     ua_browser: Optional[str] = Opt(
-        None, "--ua-browser", help="Prefer UA from this browser family"
+        None, "--ua-browser", help="Filter generated User-Agent by browser. Choices: chrome, firefox, safari, edge."
     ),
-    ua_os: Optional[str] = Opt(None, "--ua-os", help="windows/linux/macos/android/ios"),
+    ua_os: Optional[str] = Opt(None, "--ua-os", help="Filter generated User-Agent by OS. Choices: windows, linux, macos, android, ios."),
     # --- NEW - cookies / login -------------------------------------------- #
-    cookies_json: Optional[str] = Opt(None, "--cookies-json", help="Cookies JSON str"),
-    cookies_file: Optional[pathlib.Path] = Opt(None, "--cookies-file", help="cookies.json"),
-    login: Optional[str] = Opt(None, "--login", help="Interactively log in at URL"),
+    cookies_json: Optional[str] = Opt(None, "--cookies-json", help="Pass cookies as a raw JSON string."),
+    cookies_file: Optional[pathlib.Path] = Opt(None, "--cookies-file", help="Load cookies from a browser-compatible JSON file."),
+    login: Optional[str] = Opt(None, "--login", help="Perform an interactive login at the given URL to capture and save session cookies to 'cookies.json'."),
     # --- NEW - extra CSS --------------------------------------------------- #
     extra_css: Optional[str] = Opt(
         None,
         "--extra-css",
-        help="Comma-separated list of additional CSS files injected on load",
+        help="Comma-separated list of local CSS files to inject into the page before processing.",
     ),
     block: Optional[str] = Opt(
         None,
         "--block",
         "-b",
         help=(
-            "Comma-separated resource types to abort. "
-            "`img` blocks still images, `media` blocks audio/video streams."
+            "Block specific resource types to speed up loading. Comma-separated. Common values: image, media, font, script."
         ),
     ),
     viewport_width: int = Opt(
-        DEFAULT_VIEWPORT, "--viewport-width", help="Viewport width px"
+        DEFAULT_VIEWPORT, "--viewport-width", help="Set the browser viewport width in pixels for rendering."
     ),
-    quality: float = Opt(DEFAULT_SCALE, "--quality", "-q", help="device-scale-factor"),
+    quality: float = Opt(DEFAULT_SCALE, "--quality", "-q", help="Rendering quality (device scale factor) for PDF and PNG. Higher values are sharper."),
     # Optional: treat *this* command as batch when url looks like file-of-URLs
     jobs: int = Opt(
         4,
@@ -98,30 +97,43 @@ def grab(
         help="Concurrency when url points to a list-file.",
     ),
     # extraction tweaks
-    selector: Optional[str] = Opt(None, "--selector", help="CSS selector for main article"),
-    no_scroll: bool = Opt(False, "--no-scroll", help="Disable lazy-load auto-scroll"),
-    max_scrolls: int = Opt(10, "--max-scrolls", help="Auto-scroll iterations"),
+    selector: Optional[str] = Opt(None, "--selector", help="Extract content using a CSS selector, overriding the default readability algorithm."),
+    no_scroll: bool = Opt(False, "--no-scroll", help="Disable automatic scrolling, which is used to trigger lazy-loaded content."),
+    max_scrolls: int = Opt(10, "--max-scrolls", help="Set the maximum number of times to scroll down the page to load content."),
     # perf
     fast_http: bool = Opt(
         False,
         "--fast-http/--no-fast-http",
-        help="Fetch HTML via vanilla HTTP instead of Playwright when possible",
+        help="Use a simple HTTP request for HTML, bypassing the browser. Faster, but no JS rendering.",
     ),
     use_docker: bool = Opt(
         False,
         "--docker",
-        help="Run inside the official Playwright container (auto‑ports)",
+        help="Run the rendering engine inside a Docker container. Requires Docker to be installed.",
     ),
 ) -> None:
     """
-    Unified command - determines workflow solely by **--format**.
+    Fetches a single URL or a local file and converts it to a specified format.
 
-    • html / md / txt / docx / epub → article extraction & conversion  
-    • pdf / png                     → full-page capture (screen + print for PDF)  
-    Works for remote URLs *and* local HTML/Markdown files.
+    This is the main command for all single-file operations. It intelligently
+    switches between a "fetch and convert" mode for text-based formats (HTML,
+    Markdown, etc.) and a "render" mode using a real browser for pixel-perfect
+    formats (PDF, PNG).
+
+    It can also automatically act as a batch command if the URL points to a
+    file with a .txt or .urls extension.
+
+    Examples:
+
+    - sdl grab https://example.com -f md
+
+    - sdl grab ./page.html -o page.docx
+    
+    - sdl grab https://example.com -f pdf --dark-mode
     """
     # ---- Normalise parameters when we're NOT running through Typer -------- #
     fmt = _unwrap(fmt)
+    out = _unwrap(out)
 
     # Typer passes an ``OptionInfo`` sentinel when the caller doesn't specify
     # ``--out``.  Convert it to *None* first, then build a real ``Path`` only
@@ -306,11 +318,11 @@ def render(
 
 @app.command(hidden=True, name="batch")
 def batch(
-    file: pathlib.Path = Arg(..., help="Text file of URLs"),
-    fmt: str = Opt("pdf", "--format", "-f", help="Output format"),
-    jobs: int = Opt(4, "--jobs", "-j", help="Concurrency"),
+    file: pathlib.Path = Arg(..., help="Path to a text file containing one URL per line."),
+    fmt: str = Opt("pdf", "--format", "-f", help="The output format to convert all URLs to."),
+    jobs: int = Opt(4, "--jobs", "-j", help="Number of URLs to process in parallel."),
     # Forward proxy options
-    engine: str = Opt("chromium", "--engine", "-e", help="chromium | firefox | webkit"),
+    engine: str = Opt("chromium", "--engine", "-e", help="Browser engine for rendering PDF/PNG."),
     proxy: Optional[str] = Opt(None, "--proxy", help="HTTP proxy, e.g. http://host:3128"),
     proxies: Optional[str] = Opt(None, "--proxies", help="Comma-separated proxy list"),
     proxy_file: Optional[pathlib.Path] = Opt(
@@ -318,28 +330,26 @@ def batch(
     ),
     headers: Optional[str] = Opt(None, "--headers", help="Extra HTTP headers as JSON string"),
     dark_mode: bool = Opt(False, "--dark-mode", help="prefers-color-scheme: dark"),
-    viewport_width: int = Opt(
-        DEFAULT_VIEWPORT, "--viewport-width", help="Viewport width px"
-    ),
-    quality: float = Opt(DEFAULT_SCALE, "--quality", "-q", help="device-scale-factor"),
+    viewport_width: int = Opt(DEFAULT_VIEWPORT, "--viewport-width", help="Browser viewport width in pixels."),
+    quality: float = Opt(DEFAULT_SCALE, "--quality", "-q", help="Rendering quality (device scale factor)."),
     # Forward other options
-    ua_browser: Optional[str] = Opt(None, "--ua-browser", help="Prefer UA from this browser family"),
-    ua_os: Optional[str] = Opt(None, "--ua-os", help="windows/linux/macos/android/ios"),
-    cookies_json: Optional[str] = Opt(None, "--cookies-json", help="Cookies JSON str"),
-    cookies_file: Optional[pathlib.Path] = Opt(None, "--cookies-file", help="cookies.json"),
+    ua_browser: Optional[str] = Opt(None, "--ua-browser", help="Filter User-Agent by browser."),
+    ua_os: Optional[str] = Opt(None, "--ua-os", help="Filter User-Agent by OS."),
+    cookies_json: Optional[str] = Opt(None, "--cookies-json", help="Cookies as a JSON string."),
+    cookies_file: Optional[pathlib.Path] = Opt(None, "--cookies-file", help="Load cookies from a JSON file."),
     extra_css: Optional[str] = Opt(
         None,
         "--extra-css",
-        help="Comma-separated list of additional CSS files injected on load",
+        help="Comma-separated list of local CSS files to inject.",
     ),
     block: Optional[str] = Opt(
         None,
         "--block",
         "-b",
-        help="Comma‑separated resource types to abort: img,video,audio,media",
+        help="Block resource types to speed up loading (e.g., 'image,font').",
     ),
 ) -> None:
-    """Process many URLs in **parallel** using the **grab** logic."""
+    """[DEPRECATED] Process a file of URLs in parallel. 'grab' now handles this automatically."""
     # Allow the function to be called directly (unit-tests) *or* via the CLI.
     file = pathlib.Path(file)
     if not file.exists():
@@ -348,7 +358,7 @@ def batch(
 
     urls = [line.strip() for line in file.read_text().splitlines() if line.strip()]
     # ------------------------------------------------------------------ #
-    #  Nested‑loop safe‑guard - pytest‑asyncio (and Jupyter) sometimes   #
+    #  Nested‑loop safe‑guard - pytest‑asyncio (and Jupyter) sometimes   #
     #  run tests inside an already‑running event‑loop.  In that case we  #
     #  fall back to *synchronous* processing to avoid                    #
     #  "Cannot run the event loop while another loop is running".        #
