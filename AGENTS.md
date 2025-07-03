@@ -17,7 +17,7 @@ If, and only if, you are operating within a Git repository (i.e., a `.git` direc
 - **Conventional Commits**: All commit messages MUST adhere strictly to the [Conventional Commits v1.0.0 specification](https://www.conventionalcommits.org/en/v1.0.0/).
     - _Format_:
 
-      ```
+      ```git
       <type>[optional scope]: <description>
 
       [optional body]
@@ -28,7 +28,7 @@ If, and only if, you are operating within a Git repository (i.e., a `.git` direc
     - _Details_: The body should provide additional context, ideally as a bulleted list. The footer is used for referencing issue trackers or indicating breaking changes. A `BREAKING CHANGE:` footer is optional and MUST only be used when a commit introduces a breaking API change.
     - _Example_:
 
-      ```
+      ```git
       feat(api): allow users to upload profile picture
 
       - Implements the server-side logic for handling image uploads.
@@ -49,6 +49,34 @@ If, and only if, you are operating within a Git repository (i.e., a `.git` direc
 - **Reverting Changes**: Do not be afraid to undo broken changes to return to a stable state.
     - To discard uncommitted changes to a single file: `git restore <file>`.
     - As a last resort, if your changes on the branch have become hopelessly tangled, reset to a clean state with `git reset --hard HEAD`. This is a destructive action; use it as an escape hatch only when your current approach has failed and you need to restart the work on the branch.
+
+### 🚢 Merging & Completion
+
+Your work on a branch is not complete until it is successfully and safely integrated into the primary branch (often `main`).
+
+#### Definition of Done
+
+Before a branch can be considered ready for merging, it MUST meet all of the following criteria:
+
+- **✅ Functionality Complete**: All requirements of the task have been implemented.
+- **✅ All Tests Passing**: The entire test suite (unit, integration, etc.) runs successfully against the most recent code.
+- **✅ Up-to-Date**: The feature branch has been recently synced with the target branch (e.g., `main`), and all conflicts have been resolved.
+- **✅ Quality Standards Met**: The code adheres to all principles outlined in the `Coding Instructions` section.
+
+#### The Merge Process
+
+The standard process for merging is through a **Pull Request (PR)** or **Merge Request (MR)**. You MUST always prefer this over a direct local merge.
+
+1. **Sync Branch**: Ensure your branch is up-to-date with the target branch. A rebase is preferred for a linear history.
+    - `git fetch origin`
+    - `git rebase origin/main` (replace `main` with the correct target branch)
+2. **Final Verification**: After syncing, run the full test suite one last time on your branch to guarantee nothing has broken.
+3. **Create Pull Request**:
+    - Push your rebased branch to the remote repository: `git push --force-with-lease origin HEAD`.
+      - _Note_: A force push is required because rebasing rewrites commit history. `--force-with-lease` is a safer alternative to `--force` as it won't overwrite work if someone else has pushed to the branch. This command must NEVER be used on `main` or `develop`.
+    - Create a Pull Request targeting the primary branch. The PR title should be concise and the body should summarize your commits.
+4. **Await Review & Merge**: After creating the PR, you will notify the user and await a code review and merge. You WILL NOT merge your own PR unless explicitly instructed to do so and only if all automated status checks have passed.
+5. **Clean Up**: After the PR is merged, the feature branch on the remote can be deleted. You may also delete your local copy.
 
 ## ✍️ Coding Instructions
 
@@ -141,11 +169,32 @@ Be mindful of complexity but AVOID premature optimization.
 
 This is an advanced mode of operation. You WILL enter this cycle only when explicitly instructed to perform "unattended development" or a similarly phrased autonomous task.
 
-1. **Plan**: Fully comprehend the goal. Decompose it into a high-level plan of testable features. For each feature, you MUST first perform the **Discovery Phase** as defined in the `Discovery & Dependency Strategy` section. After planning, create your branch according to the Git Workflow.
-2. **Execute**: For each task, execute the TDD cycle. This may involve integrating a library or writing new code from scratch, based on the outcome of your Discovery Phase. Commit after each successful cycle.
-3. **Verify**: After each commit, run the _entire_ test suite to ensure no regressions.
-4. **Self-Correct**: If any test fails, STOP. Analyze the error to find the root cause. Formulate a fix and re-enter the TDD cycle to implement it. Use `git restore` or `git reset` if necessary to get back to a clean state.
-5. **Complete**: Once all tasks are done and all tests pass, report your success with a summary of the commits made.
+1. **Clarify & Plan**:
+    - **A. Clarify Goal**: First, restate the user's request in your own words as a clear "Statement of Work." This statement MUST include a bulleted list of specific, verifiable acceptance criteria. If the request is ambiguous, you MUST ask clarifying questions before proceeding.
+    - **B. Create Plan**: Once the goal is clear, decompose it into a high-level plan of testable features or tasks. For each feature, you MUST first perform the **Discovery Phase** as defined in the `Discovery & Dependency Strategy` section.
+    - **C. Setup Branch**: After the plan is finalized, create your branch according to the Git Workflow.
+
+2. **Execute**: For each task in your plan, execute the TDD cycle. This may involve integrating a library or writing new code from scratch, based on the outcome of your Discovery Phase. Commit after each successful cycle.
+
+3. **Verify**: After each commit, run the _entire_ test suite to ensure no regressions were introduced.
+
+4. **Verify & Self-Correct**: After each commit, run the _entire_ test suite.
+    - **If all tests pass**: Proceed to the next task in your plan.
+    - **If any test fails**: You will enter the following tiered self-correction process.
+        - **Tier 1: Tactical Fix (Up to 3 attempts)**
+            1. **Analyze**: Examine the error and the last commit to form a hypothesis on the root cause.
+            2. **Attempt Fix**: Re-enter the TDD cycle to write a specific test for the bug and implement a fix with a new commit.
+            3. If the fix also fails, repeat this tactical analysis and fix attempt up to two more times with variations on the implementation.
+        - **Tier 2: Strategic Reset**
+            1. **If all tactical fixes in Tier 1 fail**, your implementation strategy for the feature is likely flawed.
+            2. **Revert**: Reset the branch to the last known good commit (`git reset --hard <sha>`) to discard the entire failed approach for the current feature.
+            3. **Re-Plan**: Go back to the planning stage *for this specific feature*. Re-read the requirements and source code, and devise a completely new implementation strategy. Then, begin executing that new strategy from Step 2.
+        - **Tier 3: Global Stop**
+            1. If you have made 25 attempts (measured by total commits for the task) and the overall goal is still not complete, you MUST stop. This limit should be configurable.
+            2. This indicates the task is more complex than anticipated or you are in an unrecoverable loop.
+            3. You will then create a Pull Request with your last stable work where all tests passed and report your full progress, the block you encountered, the different strategies you attempted, and why you believe they failed.
+
+5. **Complete**: Once all tasks are done and all tests pass, follow the `Merging & Completion` workflow to create a Pull Request.
 
 ## 🩹 Applying Patches & Diffs
 
