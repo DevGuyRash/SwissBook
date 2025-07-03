@@ -61,15 +61,15 @@ show_missing = true
 # ---------- Scripts (uv reads from the rye table) ----------
 [tool.rye.scripts]
 # --- General Workspace Runs ---
-test = "pytest"
-cov = "pytest --cov"
-"test:par" = "pytest -n auto"
-"cov:par" = "pytest --cov -n auto"
+test     = "pytest"
+cov      = "pytest --cov"
+test-par = "pytest -n auto"
+cov-par  = "pytest --cov -n auto"
 cov-html = "coverage html"
-cov-all = "uv run cov:par && uv run cov-html"
+cov-all  = "uv run cov-par && uv run cov-html"
 
 # --- Package-Specific Runs ---
-"test:sd" = "pytest packages/site_downloader"
-"cov:sd" = "pytest --cov=site_downloader -n auto packages/site_downloader"
-"test:ybc" = "pytest packages/yt_bulk_cc"
-"cov:ybc" = "pytest --cov=yt_bulk_cc -n auto packages/yt_bulk_cc"
+test-sd = "pytest packages/site_downloader"
+cov-sd  = "pytest --cov=site_downloader -n auto packages/site_downloader"
+test-ybc = "pytest packages/yt_bulk_cc"
+cov-ybc  = "pytest --cov=yt_bulk_cc -n auto packages/yt_bulk_cc"
