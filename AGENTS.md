@@ -169,32 +169,53 @@ Be mindful of complexity but AVOID premature optimization.
 
 This is an advanced mode of operation. You WILL enter this cycle only when explicitly instructed to perform "unattended development" or a similarly phrased autonomous task.
 
+**Initial Check**: You must first determine if you have access to a pool of specialized agents (e.g., `QAAgent`, `SecurityAgent`, `DocsAgent`). Your workflow will change based on the result.
+
+---
+
+### Single-Agent Workflow
+
+_Follow this workflow if you **DO NOT** have access to specialized agents._
+
 1. **Clarify & Plan**:
     - **A. Clarify Goal**: First, restate the user's request in your own words as a clear "Statement of Work." This statement MUST include a bulleted list of specific, verifiable acceptance criteria. If the request is ambiguous, you MUST ask clarifying questions before proceeding.
     - **B. Create Plan**: Once the goal is clear, decompose it into a high-level plan of testable features or tasks. For each feature, you MUST first perform the **Discovery Phase** as defined in the `Discovery & Dependency Strategy` section.
     - **C. Setup Branch**: After the plan is finalized, create your branch according to the Git Workflow.
-
-2. **Execute**: For each task in your plan, execute the TDD cycle. This may involve integrating a library or writing new code from scratch, based on the outcome of your Discovery Phase. Commit after each successful cycle.
-
+2. **Execute**: For each task in your plan, execute the TDD cycle. Commit after each successful cycle.
 3. **Verify**: After each commit, run the _entire_ test suite to ensure no regressions were introduced.
-
-4. **Verify & Self-Correct**: After each commit, run the _entire_ test suite.
-    - **If all tests pass**: Proceed to the next task in your plan.
-    - **If any test fails**: You will enter the following tiered self-correction process.
-        - **Tier 1: Tactical Fix (Up to 3 attempts)**
-            1. **Analyze**: Examine the error and the last commit to form a hypothesis on the root cause.
-            2. **Attempt Fix**: Re-enter the TDD cycle to write a specific test for the bug and implement a fix with a new commit.
-            3. If the fix also fails, repeat this tactical analysis and fix attempt up to two more times with variations on the implementation.
-        - **Tier 2: Strategic Reset**
-            1. **If all tactical fixes in Tier 1 fail**, your implementation strategy for the feature is likely flawed.
-            2. **Revert**: Reset the branch to the last known good commit (`git reset --hard <sha>`) to discard the entire failed approach for the current feature.
-            3. **Re-Plan**: Go back to the planning stage *for this specific feature*. Re-read the requirements and source code, and devise a completely new implementation strategy. Then, begin executing that new strategy from Step 2.
-        - **Tier 3: Global Stop**
-            1. If you have made 25 attempts (measured by total commits for the task) and the overall goal is still not complete, you MUST stop. This limit should be configurable.
-            2. This indicates the task is more complex than anticipated or you are in an unrecoverable loop.
-            3. You will then create a Pull Request with your last stable work and report your full progress, the block you encountered, the different strategies you attempted, and why you believe they failed.
-
+4. **Self-Correct**: If any test fails, apply the tiered self-correction logic (Tactical Fix -> Strategic Reset -> Global Stop).
 5. **Complete**: Once all tasks are done and all tests pass, follow the `Merging & Completion` workflow to create a Pull Request.
+
+---
+
+### Multi-Agent Workflow
+
+_Follow this workflow if you **DO** have access to specialized agents. You will act as the **Orchestrator Agent**._
+
+1. **Phase 1: Plan & Delegate**
+    - **A. Clarify Goal**: Create a "Statement of Work" with verifiable acceptance criteria for the overall task.
+    - **B. Decompose & Assign**: Break the high-level goal into a series of sub-tasks and assign each to the most appropriate specialist agent. Create a dependency graph for these tasks.
+        - _Example Task -> Agent Mapping_:
+            - "Research libraries for X" -> `ResearchAgent`
+            - "Write tests for feature Y" -> `QAAgent`
+            - "Implement feature Y based on tests" -> `DeveloperAgent` (or self)
+            - "Scan for security vulnerabilities" -> `SecurityAgent`
+            - "Update documentation" -> `DocsAgent`
+    - **C. Setup Branch**: Create a single feature branch for all agents to work on.
+    - **D. Dispatch**: Dispatch tasks to specialist agents. Tasks that do not depend on each other may be dispatched in parallel.
+
+2. **Phase 2: Integrate & Verify**
+    - As each agent completes a task and commits its work to the branch, you are responsible for integrating and verifying it.
+    - After each agent's commit, you WILL run the _entire_ test suite to ensure no regressions were introduced.
+
+3. **Phase 3: Manage Failures**
+    - If an agent's work causes a test failure or is otherwise incorrect, you must manage the correction process.
+    - This may involve fixing the issue yourself (a tactical fix), re-delegating the task with more context about the failure, or reverting the flawed work and re-evaluating that part of the plan (a strategic reset).
+    - The same "Global Stop" limit (e.g., 25 total commits from all agents) applies to the overall effort.
+
+4. **Phase 4: Complete**
+    - Once all sub-tasks are complete and the final, integrated codebase passes all checks in the `Definition of Done`, follow the `Merging & Completion` workflow to create a Pull Request.
+    - The PR summary should attribute work to the specialist agents involved.
 
 ## 🩹 Applying Patches & Diffs
 
@@ -219,34 +240,19 @@ This repository uses a centralized setup script to manage dependencies. To set u
 
 ## Running Tests
 
-Tests are managed via `uv` scripts defined in the root `pyproject.toml`, providing a simple and consistent interface. These scripts leverage a centralized `pytest` configuration for all packages in the workspace.
+Testing is handled by simple, executable scripts in the `scripts/` directory. These scripts use `uv run` to execute `pytest` with the correct configuration.
 
-### Workspace Commands
+| Task                                          | Command              |
+| :-------------------------------------------- | :------------------- |
+| **Run all tests (parallel)** | `./scripts/test`     |
+| **Run tests for `site_downloader`** | `./scripts/test-sd`  |
+| **Run tests for `yt_bulk_cc`** | `./scripts/test-ybc` |
+| **Pass extra arguments to `pytest`**<br>_e.g., run a specific test file_ | `./scripts/test -k "test_specific_feature"` |
 
-These commands operate on all packages within the workspace.
+To run tests with coverage, you can add the `--cov` flag:
 
-| Task                                                                              | Command           |
-| :-------------------------------------------------------------------------------- | :---------------- |
-| **Run all tests (sequential)**<br>_Good for debugging._                           | `uv run test`     |
-| **Run all tests (parallel)**<br>_Faster; for general use._                        | `uv run test-par` |
-| **Run full coverage report (parallel)**<br>_Generates terminal and HTML reports._ | `uv run cov-all`  |
-
-### Package-Specific Commands
-
-For convenience, dedicated aliases exist to test each package individually. This is the recommended way to run tests for a single package.
-
-| Task                                             | Command           |
-| :----------------------------------------------- | :---------------- |
-| Test `site_downloader` (sequential)              | `uv run test-sd`  |
-| Run coverage for `site_downloader` (parallel)    | `uv run cov-sd`   |
-| Test `yt_bulk_cc` (sequential)                   | `uv run test-ybc` |
-| Run coverage for `yt_bulk_cc` (parallel)         | `uv run cov-ybc`  |
-
-### Execution Modes & Targeting
-
--   **Sequential vs. Parallel**: For workspace commands, the `-par` suffix runs tests in parallel. For package-specific commands, the `cov-*` scripts run in parallel for speed, while the `test-*` scripts run sequentially for easier debugging.
--   **Targeting Packages**: Using the dedicated aliases (e.g., `uv run test-sd`) is the preferred method for testing a single package.
--   **Coverage Reports**: The `cov-all` command generates a report for the entire workspace. The package-specific `cov-*` aliases generate reports only for that package. All HTML output is located in the root `htmlcov/` directory.
+-   `./scripts/test --cov`
+-   `./scripts/test-sd --cov=site_downloader`
 
 ## Troubleshooting
 
