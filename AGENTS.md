@@ -13,7 +13,7 @@ If, and only if, you are operating within a Git repository (i.e., a `.git` direc
 
 ### COMMIT Committing Changes
 
-- **Atomic Commits & Checkpoints**: You WILL make small, frequent commits that represent a single logical unit of work. This practice is non-negotiable as it creates a detailed history and provides safe, granular checkpoints to revert to if a future change introduces problems. A commit should be made after each successful Red-Green-Refactor cycle.
+- **Atomic Commits & Checkpoints**: You WILL make small, frequent commits that represent a single logical unit of work. This practice is non-negotiable as it creates a detailed history and provides safe, granular checkpoints to revert to. After completing a unit of work, you MUST stage the relevant changes using `git add <file>...` before creating the commit with `git commit`. A commit should be made after each successful Red-Green-Refactor cycle.
 - **Conventional Commits**: All commit messages MUST adhere strictly to the [Conventional Commits v1.0.0 specification](https://www.conventionalcommits.org/en/v1.0.0/).
     - _Format_:
 
@@ -52,7 +52,7 @@ If, and only if, you are operating within a Git repository (i.e., a `.git` direc
 
 ### 🚢 Merging & Completion
 
-Your work on a branch is not complete until it is successfully and safely integrated into the primary branch (often `main`).
+Your work on a branch is not complete until it is successfully and safely integrated into the primary branch (`main`, `develop`).
 
 #### Definition of Done
 
@@ -67,7 +67,7 @@ Before a branch can be considered ready for merging, it MUST meet all of the fol
 
 The standard process for merging is through a **Pull Request (PR)** or **Merge Request (MR)**. You MUST always prefer this over a direct local merge.
 
-1. **Sync Branch**: Ensure your branch is up-to-date with the target branch. A rebase is preferred for a linear history.
+1. **Sync Branch**: Before creating a Pull Request, you must update your feature branch with the latest changes from the target branch (e.g., `main`). This ensures your changes work with the most recent version of the codebase. A rebase is required to maintain a clean, linear project history.
     - `git fetch origin`
     - `git rebase origin/main` (replace `main` with the correct target branch)
 2. **Final Verification**: After syncing, run the full test suite one last time on your branch to guarantee nothing has broken.
@@ -192,7 +192,7 @@ This is an advanced mode of operation. You WILL enter this cycle only when expli
         - **Tier 3: Global Stop**
             1. If you have made 25 attempts (measured by total commits for the task) and the overall goal is still not complete, you MUST stop. This limit should be configurable.
             2. This indicates the task is more complex than anticipated or you are in an unrecoverable loop.
-            3. You will then create a Pull Request with your last stable work where all tests passed and report your full progress, the block you encountered, the different strategies you attempted, and why you believe they failed.
+            3. You will then create a Pull Request with your last stable work and report your full progress, the block you encountered, the different strategies you attempted, and why you believe they failed.
 
 5. **Complete**: Once all tasks are done and all tests pass, follow the `Merging & Completion` workflow to create a Pull Request.
 
