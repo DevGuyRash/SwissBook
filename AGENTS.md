@@ -15,46 +15,73 @@ If, and only if, you are operating within a Git repository (i.e., a `.git` direc
 
 - **Atomic Commits**: You WILL make small, frequent commits that represent a single logical change. A good practice is to commit after each successful Red-Green-Refactor cycle.
 - **Conventional Commits**: All commit messages MUST adhere strictly to the [Conventional Commits v1.0.0 specification](https://www.conventionalcommits.org/en/v1.0.0/).
-  - _Format_:
+    - _Format_:
 
-    ```git
-    <type>[optional scope]: <description>
+      ```
+      <type>[optional scope]: <description>
 
-    [optional body]
+      [optional body]
 
-    [optional footer(s)]
-    ```
+      [optional footer(s)]
+      ```
 
-  - _Details_: The body should provide additional context, ideally as a bulleted list. The footer is used for referencing issue trackers or indicating breaking changes. A `BREAKING CHANGE:` footer is optional and MUST only be used when a commit introduces a breaking API change.
-  - _Example_:
+    - _Details_: The body should provide additional context, ideally as a bulleted list. The footer is used for referencing issue trackers or indicating breaking changes. A `BREAKING CHANGE:` footer is optional and MUST only be used when a commit introduces a breaking API change.
+    - _Example_:
 
-    ```git
-    feat(api): allow users to upload profile picture
+      ```
+      feat(api): allow users to upload profile picture
 
-    - Implements the server-side logic for handling image uploads.
-    - Adds a new POST route at `/api/users/avatar`.
-    - Updates the user profile response model to include the new avatar URL.
+      - Implements the server-side logic for handling image uploads.
+      - Adds a new POST route at `/api/users/avatar`.
+      - Updates the user profile response model to include the new avatar URL.
 
-    BREAKING CHANGE: The user profile endpoint response now includes
-    an `avatarUrl` field instead of `pictureUrl`.
-    ```
+      BREAKING CHANGE: The user profile endpoint response now includes
+      an `avatarUrl` field instead of `pictureUrl`.
+      ```
 
 ### Workspace & History
 
 - **Gather Context**: You are expected to use Git commands to understand the project's state and history before making changes.
-  - `git status` to see your current changes.
-  - `git log --oneline -n 10` to review recent commits.
-  - `git diff HEAD` to review your uncommitted changes.
-  - `git blame <file>` to understand the history of a specific piece of code.
+    - `git status` to see your current changes.
+    - `git log --oneline -n 10` to review recent commits.
+    - `git diff HEAD` to review your uncommitted changes.
+    - `git blame <file>` to understand the history of a specific piece of code.
 - **Reverting Changes**: Do not be afraid to undo broken changes to return to a stable state.
-  - To discard uncommitted changes to a single file: `git restore <file>`.
-  - As a last resort, if your changes on the branch have become hopelessly tangled, reset to a clean state with `git reset --hard HEAD`. This is a destructive action; use it as an escape hatch only when your current approach has failed and you need to restart the work on the branch.
+    - To discard uncommitted changes to a single file: `git restore <file>`.
+    - As a last resort, if your changes on the branch have become hopelessly tangled, reset to a clean state with `git reset --hard HEAD`. This is a destructive action; use it as an escape hatch only when your current approach has failed and you need to restart the work on the branch.
 
 ## ✍️ Coding Instructions
 
 ### 🏆 Coding Quality
 
 Your primary directive is to produce code that is not merely functional, but exemplary in its quality. It MUST be clean, scalable, maintainable, and secure. This quality is achieved by letting tests guide the development process. Adherence to the following principles is non-negotiable.
+
+### 🔎 Discovery & Dependency Strategy
+
+You MUST NOT "reinvent the wheel." Your default position is to use well-maintained, existing libraries to solve common problems. Writing custom code adds to the maintenance burden and should be a last resort.
+
+#### The Discovery Phase
+
+Before implementing any significant new functionality (e.g., a CSV parser, a state management solution), you MUST perform a discovery phase.
+
+1. **Identify Core Problem**: Abstract the request into a generic problem statement.
+2. **Search for Solutions**: Search relevant package registries (e.g., npm, PyPI, Maven Central) for existing libraries that solve this problem.
+
+#### Vetting Checklist
+
+You are only permitted to use a third-party library if it meets ALL of the following criteria. You must explicitly verify each point.
+
+- **✅ Active Maintenance**: The project shows recent activity (e.g., commits/releases within the last 6-12 months).
+- **✅ Robustness & Popularity**: The library is widely used and trusted by the community (e.g., significant download counts, stars).
+- **✅ Security**: A security audit (e.g., `npm audit`) reveals no critical, unpatched vulnerabilities.
+- **✅ Functionality Match**: The library's features directly address the core problem.
+- **✅ License Compatibility**: The library's license (e.g., MIT, Apache 2.0) is compatible with the project's license. You MUST flag any copyleft licenses (e.g., GPL, AGPL) to the user, as they may be incompatible.
+
+#### Implementation Decision
+
+- **If a library passes all checks**: Add it as a project dependency. Your task is now to integrate this library.
+- **If a library passes all checks but only partially solves the problem**: Create a "wrapper" or "adapter" module that uses the library and adds the missing functionality. Do not replicate its features.
+- **If no suitable library can be found OR the only suitable libraries have incompatible licenses**: You are authorized to write a new implementation from scratch. You must justify this decision.
 
 ### ✨ Foundational Principles
 
@@ -67,10 +94,10 @@ Your primary directive is to produce code that is not merely functional, but exe
 - **Consistency**: You WILL detect and conform to existing project styles and patterns.
 - **Modularity**: You MUST decompose complex logic into smaller, highly-cohesive, and loosely-coupled functions or modules.
 - **Refactoring Strategy**:
-  - Your primary goal is to fulfill the user's immediate request. You MUST NOT engage in large-scale, speculative refactoring that is out of scope.
-  - If existing code is fundamentally flawed and it impedes the current task, you are empowered to refactor it. This refactoring MUST be justified and protected by comprehensive tests.
-  - When refactoring, you WILL favor a series of small, verifiable changes over a single "big bang" rewrite.
-  - If you identify a major architectural issue not directly related to the current task, complete the task first, then recommend the larger refactor as a separate action.
+  - Your primary goal is to fulfill the user's immediate request. You MUST NOT engage in large-scale, speculative refactoring.
+  - If existing code is flawed and impedes the task, you are empowered to refactor it, protected by tests.
+  - Favor a series of small, verifiable changes over a "big bang" rewrite.
+  - If you identify a major architectural issue not directly related to the task, complete the task first, then recommend the larger refactor as a separate action.
 
 ### ⚙️ Robustness & Reliability
 
@@ -87,17 +114,17 @@ Your primary directive is to produce code that is not merely functional, but exe
 - **Secure by Design**: Assume all input is hostile. Sanitize inputs. Never hard-code secrets.
 - **Algorithmic Efficiency**: Be mindful of complexity but AVOID premature optimization.
 
-## 🤖 Unattended Development Cycle
+### 🤖 Unattended Development Cycle
 
 This is an advanced mode of operation. You WILL enter this cycle only when explicitly instructed to perform "unattended development" or a similarly phrased autonomous task.
 
-1. **Plan**: Fully comprehend the goal. Decompose it into a high-level plan of testable features. Create your branch according to the Git Workflow.
-2. **Execute**: For each task, execute the Red-Green-Refactor TDD cycle. Commit after each successful cycle.
+1. **Plan**: Fully comprehend the goal. Decompose it into a high-level plan of testable features. For each feature, you MUST first perform the **Discovery Phase** as defined in the `Discovery & Dependency Strategy` section. After planning, create your branch according to the Git Workflow.
+2. **Execute**: For each task, execute the TDD cycle. This may involve integrating a library or writing new code from scratch, based on the outcome of your Discovery Phase. Commit after each successful cycle.
 3. **Verify**: After each commit, run the _entire_ test suite to ensure no regressions.
 4. **Self-Correct**: If any test fails, STOP. Analyze the error to find the root cause. Formulate a fix and re-enter the TDD cycle to implement it. Use `git restore` or `git reset` if necessary to get back to a clean state.
 5. **Complete**: Once all tasks are done and all tests pass, report your success with a summary of the commits made.
 
-## 🩹 Applying Patches & Diffs
+### 🩹 Applying Patches & Diffs
 
 The following rules apply _only_ when you are given a patch or diff file as input. This is a literal transcription task, not a creative coding task, and it supersedes the normal TDD and refactoring workflow.
 
@@ -106,7 +133,7 @@ The following rules apply _only_ when you are given a patch or diff file as inpu
 - After applying the patch, you WILL use `diff` to compare the backup with the new file to verify the result is identical to the input patch.
 - If a patch uses truncation (`...`), use reasoning to identify the full block in the source and replace it.
 
-## Running Tests
+### Running Tests
 
 Inside each test, prefer to use the following command for testing:
 
@@ -116,8 +143,8 @@ uv run --all-extras pytest -n auto --cov=site_downloader --cov-report=term-missi
 
 This will run the tests with all extras installed, using multiple CPUs for parallelization, and generate a coverage report in HTML format.
 
-## Troubleshooting
+### Troubleshooting
 
-### Missing Dependencies
+#### Missing Dependencies
 
 Be sure to locate the uv.lock for the correct package. Each package in `/packages` has its own uv.lock file as this repo is a monorepo containing multiple, isolated and independent packages. Use `uv sync --all-extras` to install all dependencies for the current package.
