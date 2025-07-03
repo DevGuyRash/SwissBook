@@ -21,16 +21,17 @@ This tool is designed to be run as a standalone script from the monorepo root.
 
 ## Installation
 
-This package is part of the SwissBook monorepo. From the repository root, run:
+This package is part of the SwissBook monorepo. From the repository root, run the main setup script, which will install this tool and its dependencies:
 
 ```bash
-# Create and activate a virtual environment (if not already done)
-uv venv .venv
-source .venv/bin/activate
+# This handles virtualenv creation and all dependencies
+./setup.sh --dev
 
-# Install the script and its dependencies in editable mode
-uv pip install -e "packages/yt_bulk_cc"
+# Activate the environment (once per shell session)
+source .venv/bin/activate
 ```
+
+> For more details, see the [**main project README**](../../README.md).
 
 ---
 

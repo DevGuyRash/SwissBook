@@ -9,19 +9,17 @@ https://example.com  --- ▶  example.pdf  (screen + print)
 
 ## Installation
 
-> Requires Python >= 3.10. All commands below use **uv** but you can swap in plain `pip` if preferred.
+This package is part of the SwissBook monorepo. From the repository root, run the main setup script, which will install this tool and its dependencies:
 
 ```bash
-# 1. create & activate an isolated env from the repo root
-uv venv .venv
+# This handles virtualenv creation, dependencies, and browser binaries
+./setup.sh --dev
+
+# Activate the environment (once per shell session)
 source .venv/bin/activate
-
-# 2. editable install (dev mode)
-uv pip install -e "packages/site_downloader[dev]"
-
-# 3. install Playwright browsers once
-python -m playwright install --with-deps
 ```
+
+> For more details, see the [**main project README**](../../README.md).
 
 ---
 

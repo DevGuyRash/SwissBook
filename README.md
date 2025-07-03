@@ -11,7 +11,7 @@ This repository currently contains the following standalone tools:
 | Tool                | CLI             | Description                                                                                                                                   | Documentation                                                                  |
 | :------------------ | :-------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------- |
 | **Site Downloader** | `sdl`           | A versatile web page downloader and converter. It fetches, cleans, and converts pages to PDF, PNG, Markdown, DOCX, and more using Playwright. | [**`packages/site_downloader/README.md`**](packages/site_downloader/README.md) |
-| **YouTube Bulk CC** | `yt_bulk_cc.py` | A script to bulk-download YouTube transcripts for single videos, playlists, or entire channels-no API key required.                           | See built-in help (`--help`)                                                   |
+| **YouTube Bulk CC** | `yt_bulk_cc.py` | A script to bulk-download YouTube transcripts for single videos, playlists, or entire channels—no API key required.                           | [**`packages/yt_bulk_cc/README.md`**](packages/yt_bulk_cc/README.md)           |
 
 ---
 
@@ -25,39 +25,32 @@ This repository currently contains the following standalone tools:
 
 ## 🚀 Quick start
 
-### 1. Clone & enter the repo
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/devguyrash/SwissBook.git
 cd SwissBook
 ```
 
-### 2. Create a shared virtual environment
+### 2. Run the setup script
 
-It's recommended to install all Python packages into a single environment.
+This one-time command creates a shared virtual environment (`.venv`), installs all tools with their development dependencies, and downloads the necessary Playwright browser binaries.
 
 ```bash
-# create & enter a virtual env (per shell)
-uv venv .venv
+./setup.sh --dev
+```
+
+### 3. Activate the environment
+
+You only need to do this once per shell session.
+
+```bash
 source .venv/bin/activate
 ```
 
-### 3. Install tools
+### 4. Use the tools
 
-Install each tool in editable mode.
-
-```bash
-# Install the Site Downloader and its dev dependencies
-uv pip install -e "packages/site_downloader[dev]"
-
-# Install Playwright's browser binaries (one-time setup)
-python -m playwright install --with-deps
-
-# Install the YouTube Bulk CC script and its dependencies
-uv pip install -e "packages/yt_bulk_cc"
-```
-
-### 4. Basic usage
+Once the environment is active, you can invoke the tools from anywhere in the repository.
 
 #### Site Downloader (`sdl`)
 
@@ -67,9 +60,6 @@ sdl grab https://example.com -f pdf
 
 # Fetch an article-only version as Markdown
 sdl grab https://some.blog/article -f md
-
-# Process a list of URLs from a file into PNGs with 4 concurrent jobs
-sdl grab ./path/to/urls.txt -f png -j 4
 ```
 
 > See the [**`site-downloader` README**](packages/site_downloader/README.md) for all options.
@@ -80,42 +70,27 @@ sdl grab ./path/to/urls.txt -f png -j 4
 # Get transcripts for a whole playlist as individual JSON files
 python -m yt_bulk_cc.yt_bulk_cc "https://www.youtube.com/playlist?list=YOUR_PLAYLIST_ID" -f json
 
-# Get a single video's transcript as plain text with timestamps
-python -m yt_bulk_cc.yt_bulk_cc https://www.youtube.com/watch?v=VIDEO_ID -f text -t
-
 # Combine all transcripts from a channel into a single file
 python -m yt_bulk_cc.yt_bulk_cc "https://www.youtube.com/channel/YOUR_CHANNEL_ID" -f text -C combined_transcripts
 ```
 
-> See the script's built-in help for all options: `python -m yt_bulk_cc.yt_bulk_cc --help`
-
-## Installation
-
-### Running with the Playwright Docker image
-
->If you'd rather avoid installing ~1 GB of browser binaries locally, you can
->run *sdl* in a container:
->
->```bash
->pip install "site_downloader[docker]"
->SDL_PLAYWRIGHT_DOCKER=1 sdl grab https://example.com -f pdf
->```
+> See the [**`yt_bulk_cc` README**](packages/yt_bulk_cc/README.md) for all options.
 
 ---
 
 ## ✍️ Adding a new tool
 
-1. `mkdir packages/my_tool && cd packages/my_tool`
-2. Scaffold language-specific files (`pyproject.toml`, `src/my_tool/__init__.py`, or `package.json`, etc.).
-3. Add a `README.md` inside `packages/my_tool/` explaining its purpose and usage.
-4. Update the `## Available Tools` table in this main `README.md`.
+1.  `mkdir packages/my_tool && cd packages/my_tool`
+2.  Scaffold language-specific files (`pyproject.toml`, `src/my_tool/__init__.py`, or `package.json`, etc.).
+3.  Add a `README.md` inside `packages/my_tool/` explaining its purpose and usage.
+4.  Update the `## Available Tools` table in this main `README.md`.
 
 ---
 
 ## 🤝 Contributing
 
 - Fork → branch → PR.
-- Keep utilities self-contained-avoid cross-package imports unless there's a good reason.
+- Keep utilities self-contained and avoid cross-package imports unless there's a good reason.
 - Run any relevant test commands before pushing.
 
 ---
