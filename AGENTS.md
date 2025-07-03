@@ -4,16 +4,16 @@
 
 If, and only if, you are operating within a Git repository (i.e., a `.git` directory exists), you MUST adhere to the following workflow. Your first action upon receiving a task should be to verify this condition and act accordingly.
 
-### Branching Strategy
+### 🌿 Branching Strategy
 
 1. **Check for Existing Branch**: Before starting, check your current branch with `git branch --show-current`. If it appears to be a feature branch already created for the current task (e.g., `feat/new-login-page`), you must continue your work there to avoid duplication.
 2. **Create a New Branch**: If you are on a primary branch like `main`, `master`, or `develop`, you MUST create a new branch before making any file modifications.
     - Branch names MUST be descriptive and follow this pattern: `<type>/<short-description>` (e.g., `feat/user-auth-api`, `fix/incorrect-password-error`). The `type` should align with Conventional Commit types.
     - Use `git checkout -b <branch-name>` to create and switch to the new branch.
 
-### Committing Changes
+### COMMIT Committing Changes
 
-- **Atomic Commits**: You WILL make small, frequent commits that represent a single logical change. A good practice is to commit after each successful Red-Green-Refactor cycle.
+- **Atomic Commits & Checkpoints**: You WILL make small, frequent commits that represent a single logical unit of work. This practice is non-negotiable as it creates a detailed history and provides safe, granular checkpoints to revert to if a future change introduces problems. A commit should be made after each successful Red-Green-Refactor cycle.
 - **Conventional Commits**: All commit messages MUST adhere strictly to the [Conventional Commits v1.0.0 specification](https://www.conventionalcommits.org/en/v1.0.0/).
     - _Format_:
 
@@ -39,7 +39,7 @@ If, and only if, you are operating within a Git repository (i.e., a `.git` direc
       an `avatarUrl` field instead of `pictureUrl`.
       ```
 
-### Workspace & History
+### 📜 Workspace & History
 
 - **Gather Context**: You are expected to use Git commands to understand the project's state and history before making changes.
     - `git status` to see your current changes.
@@ -85,36 +85,59 @@ You are only permitted to use a third-party library if it meets ALL of the follo
 
 ### ✨ Foundational Principles
 
-- You MUST design solutions around established software design principles. Adhering to a strict TDD cycle is the primary mechanism by which you will achieve this.
-  - **SOLID**, **DRY**, **KISS**, **YAGNI**.
+You MUST design solutions around established software design principles. Adhering to a strict TDD cycle is the primary mechanism by which you will achieve this.
+
+- **SOLID**: Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion.
+- **DRY**: Don't Repeat Yourself.
+- **KISS**: Keep It Simple, Stupid.
+- **YAGNI**: You Ain't Gonna Need It.
 
 ### 📖 Readability & Maintainability
 
-- **Code Clarity**: Code MUST be self-documenting. Use clear, unambiguous names. Comments explain the _why_, not the _what_.
-- **Consistency**: You WILL detect and conform to existing project styles and patterns.
-- **Modularity**: You MUST decompose complex logic into smaller, highly-cohesive, and loosely-coupled functions or modules.
-- **Refactoring Strategy**:
-  - Your primary goal is to fulfill the user's immediate request. You MUST NOT engage in large-scale, speculative refactoring.
-  - If existing code is flawed and impedes the task, you are empowered to refactor it, protected by tests.
-  - Favor a series of small, verifiable changes over a "big bang" rewrite.
-  - If you identify a major architectural issue not directly related to the task, complete the task first, then recommend the larger refactor as a separate action.
+#### 💡 Code Clarity
+
+Code MUST be self-documenting. Use clear, unambiguous names. Comments explain the _why_, not the _what_.
+
+#### 🎨 Consistency
+
+You WILL detect and conform to existing project styles and patterns.
+
+#### 🧱 Modularity
+
+You MUST decompose complex logic into smaller, highly-cohesive, and loosely-coupled functions or modules.
+
+#### 🛠️ Refactoring Strategy
+
+- Your primary goal is to fulfill the user's immediate request. You MUST NOT engage in large-scale, speculative refactoring.
+- If existing code is flawed and impedes the task, you are empowered to refactor it, protected by tests.
+- Favor a series of small, verifiable changes over a "big bang" rewrite.
+- If you identify a major architectural issue not directly related to the task, complete the task first, then recommend the larger refactor as a separate action.
 
 ### ⚙️ Robustness & Reliability
 
-- **Error Handling**: You MUST implement comprehensive error handling and validate all external data.
-- **Testing Methodology**:
-  - Your primary approach WILL be **Test-Driven Development (TDD)**.
-  - **The Red-Green-Refactor Cycle**: You WILL follow this cycle: 1. **Red** (write a failing test), 2. **Green** (write minimal code to pass), 3. **Refactor** (clean up the code).
-  - **Meaningful Tests**: Tests MUST validate _behavior_ and business logic, including edge cases. Test the public contract, not private implementation.
-  - **Scope of Testing**: You WILL NOT test third-party libraries. You WILL test your code that _integrates with_ them using mocks and stubs.
-  - **Choosing Test Types**: Use **Unit Tests** for isolated components (most tests), **Integration Tests** for interactions between components, and **E2E Tests** for critical user workflows.
+#### 🚨 Error Handling
+
+You MUST implement comprehensive error handling and validate all external data.
+
+#### 🧪 Testing Methodology
+
+- Your primary approach WILL be **Test-Driven Development (TDD)**.
+- **The Red-Green-Refactor Cycle**: You WILL follow this cycle: 1. **Red** (write a failing test), 2. **Green** (write minimal code to pass), 3. **Refactor** (clean up the code).
+- **Meaningful Tests**: Tests MUST validate _behavior_ and business logic, including edge cases. Test the public contract, not private implementation.
+- **Scope of Testing**: You WILL NOT test third-party libraries. You WILL test your code that _integrates with_ them using mocks and stubs.
+- **Choosing Test Types**: Use **Unit Tests** for isolated components (most tests), **Integration Tests** for interactions between components, and **E2E Tests** for critical user workflows.
 
 ### 🛡️ Security & Performance
 
-- **Secure by Design**: Assume all input is hostile. Sanitize inputs. Never hard-code secrets.
-- **Algorithmic Efficiency**: Be mindful of complexity but AVOID premature optimization.
+#### 🔐 Secure by Design
 
-### 🤖 Unattended Development Cycle
+Assume all input is hostile. Sanitize inputs. Never hard-code secrets.
+
+#### ⚡ Algorithmic Efficiency
+
+Be mindful of complexity but AVOID premature optimization.
+
+## 🤖 Unattended Development Cycle
 
 This is an advanced mode of operation. You WILL enter this cycle only when explicitly instructed to perform "unattended development" or a similarly phrased autonomous task.
 
@@ -124,7 +147,7 @@ This is an advanced mode of operation. You WILL enter this cycle only when expli
 4. **Self-Correct**: If any test fails, STOP. Analyze the error to find the root cause. Formulate a fix and re-enter the TDD cycle to implement it. Use `git restore` or `git reset` if necessary to get back to a clean state.
 5. **Complete**: Once all tasks are done and all tests pass, report your success with a summary of the commits made.
 
-### 🩹 Applying Patches & Diffs
+## 🩹 Applying Patches & Diffs
 
 The following rules apply _only_ when you are given a patch or diff file as input. This is a literal transcription task, not a creative coding task, and it supersedes the normal TDD and refactoring workflow.
 
