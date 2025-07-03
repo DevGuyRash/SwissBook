@@ -1,0 +1,66 @@
+{
+  "bundles": {
+    "site_downloader-286": {
+      "name": "site_downloader-no-tests",
+      "created": "2025-07-03T15:01:04.830Z",
+      "lastUsed": "2025-07-03T15:01:04.830Z",
+      "tags": [],
+      "files": [
+        "packages/site_downloader/src",
+        "packages/site_downloader/pyproject.toml",
+        "packages/site_downloader/pytest.ini",
+        "packages/site_downloader/README.md",
+        "scripts",
+        "uv.lock",
+        "README.md",
+        "pyproject.toml",
+        "AGENTS.md"
+      ]
+    },
+    "site_downloader-full-330": {
+      "name": "site_downloader-full",
+      "created": "2025-07-03T15:01:56.635Z",
+      "lastUsed": "2025-07-03T15:01:56.635Z",
+      "tags": [],
+      "files": [
+        "packages/site_downloader",
+        "uv.lock",
+        "scripts",
+        "README.md",
+        "pyproject.toml",
+        "AGENTS.md"
+      ]
+    },
+    "yt_bulk_cc-full-478": {
+      "name": "yt_bulk_cc-full",
+      "created": "2025-07-03T15:02:30.549Z",
+      "lastUsed": "2025-07-03T15:06:13.706Z",
+      "tags": [],
+      "files": [
+        "packages/yt_bulk_cc",
+        "AGENTS.md",
+        "pyproject.toml",
+        "README.md",
+        "scripts",
+        "uv.lock"
+      ]
+    },
+    "yt_bulk_cc-no-tests-776": {
+      "name": "yt_bulk_cc-no-tests",
+      "created": "2025-07-03T15:04:46.562Z",
+      "lastUsed": "2025-07-03T15:04:46.562Z",
+      "tags": [],
+      "files": [
+        "scripts",
+        "AGENTS.md",
+        "pyproject.toml",
+        "README.md",
+        "uv.lock",
+        "packages/yt_bulk_cc/src",
+        "packages/yt_bulk_cc/pyproject.toml",
+        "packages/yt_bulk_cc/README.md",
+        "packages/yt_bulk_cc/assets"
+      ]
+    }
+  }
+}

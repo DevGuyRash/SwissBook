@@ -350,6 +350,7 @@ pip-selfcheck.json
 
 
 *repomix*
+!/.repomix/
 *.srt
 *.vtt
 **/packages/yt_bulk_cc/**/*.json
