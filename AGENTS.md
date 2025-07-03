@@ -133,18 +133,38 @@ The following rules apply _only_ when you are given a patch or diff file as inpu
 - After applying the patch, you WILL use `diff` to compare the backup with the new file to verify the result is identical to the input patch.
 - If a patch uses truncation (`...`), use reasoning to identify the full block in the source and replace it.
 
-### Running Tests
+## Environment Setup
 
-Inside each test, prefer to use the following command for testing:
+This repository uses a centralized setup script to manage dependencies. To set up the development environment:
 
 ```bash
-uv run --all-extras pytest -n auto --cov=site_downloader --cov-report=term-missing --cov-report=html
+# Install all packages with development dependencies
+./setup.sh --dev
+
+# Or for production use (minimal dependencies):
+# ./setup.sh --prod
 ```
 
-This will run the tests with all extras installed, using multiple CPUs for parallelization, and generate a coverage report in HTML format.
+## Running Tests
 
-### Troubleshooting
+After setting up the environment, you can run tests for individual packages. For example, to test the site_downloader package:
 
-#### Missing Dependencies
+```bash
+# Activate the virtual environment first
+source .venv/bin/activate
 
-Be sure to locate the uv.lock for the correct package. Each package in `/packages` has its own uv.lock file as this repo is a monorepo containing multiple, isolated and independent packages. Use `uv sync --all-extras` to install all dependencies for the current package.
+# Run tests for site_downloader with coverage
+pytest packages/site_downloader/tests -n auto --cov=site_downloader --cov-report=term-missing --cov-report=html
+```
+
+## Troubleshooting
+
+### Missing Dependencies
+
+If you encounter missing dependencies, ensure you've run the setup script with the appropriate flags:
+
+- `--dev` for development (includes test and dev dependencies)
+- `--all-extras` to include all optional dependencies
+- `--extra` to include specific extras (comma-separated)
+
+The setup script will create a shared virtual environment (`.venv`) at the repository root and install all necessary dependencies there.
