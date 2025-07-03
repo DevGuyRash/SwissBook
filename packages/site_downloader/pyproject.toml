@@ -32,6 +32,3 @@ sdl = "site_downloader.cli:app"      # `sdl --help`
 [build-system]
 requires = ["uv", "setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
-
-[tool.uv.sources]
-site_downloader = { path = "src/site_downloader", editable = true }

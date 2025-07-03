@@ -25,6 +25,51 @@ dev = [
 # This tells uv where to find the individual packages.
 [tool.uv.workspace]
 members = [
-    "packages/site_downloader",
-    "packages/yt_bulk_cc"
+  "packages/site_downloader",
+  "packages/yt_bulk_cc"
 ]
+
+# ========== TESTS ==========
+
+# ---------- PyTest ----------
+[tool.pytest.ini_options]
+# Automatically discover tests in these paths
+testpaths = ["packages/"]
+# Automatically apply asyncio marker for pytest-asyncio
+asyncio_mode = "auto"
+markers = [
+    "serial: tests that must not run in parallel (one container at a time)",
+    "e2e: end to end tests that require external dependencies",
+]
+
+# ---------- Coverage ----------
+[tool.coverage.run]
+# Measure coverage against all source code within the packages directory
+source = ["packages"]
+# Omit test files and conftest from the coverage report
+omit = [
+    "*/tests/*",
+    "*/conftest.py",
+]
+
+[tool.coverage.report]
+# Optional: Fail the run if total coverage is below a certain threshold
+# fail_under = 90
+# Show lines that are missing from coverage in the terminal report
+show_missing = true
+
+# ---------- Scripts (uv reads from the rye table) ----------
+[tool.rye.scripts]
+# --- General Workspace Runs ---
+test = "pytest"
+cov = "pytest --cov"
+"test:par" = "pytest -n auto"
+"cov:par" = "pytest --cov -n auto"
+cov-html = "coverage html"
+cov-all = "uv run cov:par && uv run cov-html"
+
+# --- Package-Specific Runs ---
+"test:sd" = "pytest packages/site_downloader"
+"cov:sd" = "pytest --cov=site_downloader -n auto packages/site_downloader"
+"test:ybc" = "pytest packages/yt_bulk_cc"
+"cov:ybc" = "pytest --cov=yt_bulk_cc -n auto packages/yt_bulk_cc"

@@ -170,15 +170,38 @@ This repository uses a centralized setup script to manage dependencies. To set u
 
 ## Running Tests
 
-After setting up the environment, you can run tests for individual packages. For example, to test the site_downloader package:
+Tests are managed via `uv` scripts defined in the root `pyproject.toml`, providing a simple and consistent interface. These scripts leverage a centralized `pytest` configuration for all packages in the workspace.
 
-```bash
-# Activate the virtual environment first
-source .venv/bin/activate
+## Running Tests
 
-# Run tests for site_downloader with coverage
-pytest packages/site_downloader/tests -n auto --cov=site_downloader --cov-report=term-missing --cov-report=html
-```
+Tests are managed via `uv` scripts defined in the root `pyproject.toml`, providing a simple and consistent interface. These scripts leverage a centralized `pytest` configuration for all packages in the workspace.
+
+### Workspace Commands
+
+These commands operate on all packages within the workspace.
+
+| Task                                                                              | Command           |
+| :-------------------------------------------------------------------------------- | :---------------- |
+| **Run all tests (sequential)**<br>_Good for debugging._                           | `uv run test`     |
+| **Run all tests (parallel)**<br>_Faster; for general use._                        | `uv run test:par` |
+| **Run full coverage report (parallel)**<br>_Generates terminal and HTML reports._ | `uv run cov-all`  |
+
+### Package-Specific Commands
+
+For convenience, dedicated aliases exist to test each package individually. This is the recommended way to run tests for a single package.
+
+| Task                                          | Command           |
+| :-------------------------------------------- | :---------------- |
+| Test `site_downloader` (sequential)           | `uv run test:sd`  |
+| Run coverage for `site_downloader` (parallel) | `uv run cov:sd`   |
+| Test `yt_bulk_cc` (sequential)                | `uv run test:ybc` |
+| Run coverage for `yt_bulk_cc` (parallel)      | `uv run cov:ybc`  |
+
+### Execution Modes & Targeting
+
+- **Sequential vs. Parallel**: For workspace commands, the `:par` suffix runs tests in parallel. For package-specific commands, the `cov*:` scripts run in parallel for speed, while the `test*:` scripts run sequentially for easier debugging.
+- **Targeting Packages**: Using the dedicated aliases (e.g., `uv run test:sd`) is the preferred method for testing a single package. However, you can still append a path to a general command (e.g., `uv run test packages/site_downloader`).
+- **Coverage Reports**: The `cov-all` command generates a report for the entire workspace. The package-specific `cov*:` aliases generate reports only for that package. All HTML output is located in the root `htmlcov/` directory.
 
 ## Troubleshooting
 
