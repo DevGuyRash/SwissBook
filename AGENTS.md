@@ -15,7 +15,7 @@ If, and only if, you are operating within a Git repository (i.e., a `.git` direc
 
 - **Atomic Commits & Checkpoints**: You WILL make small, frequent commits that represent a single logical unit of work. This practice is non-negotiable as it creates a detailed history and provides safe, granular checkpoints to revert to. After completing a unit of work, you MUST stage the relevant changes using `git add <file>...` before creating the commit with `git commit`. A commit should be made after each successful Red-Green-Refactor cycle.
 - **Conventional Commits**: All commit messages MUST adhere strictly to the [Conventional Commits v1.0.0 specification](https://www.conventionalcommits.org/en/v1.0.0/).
-    - _Format_:
+  - _Format_:
 
       ```git
       <type>[optional scope]: <description>
@@ -25,8 +25,8 @@ If, and only if, you are operating within a Git repository (i.e., a `.git` direc
       [optional footer(s)]
       ```
 
-    - _Details_: The body should provide additional context, ideally as a bulleted list. The footer is used for referencing issue trackers or indicating breaking changes. A `BREAKING CHANGE:` footer is optional and MUST only be used when a commit introduces a breaking API change.
-    - _Example_:
+  - _Details_: The body should provide additional context, ideally as a bulleted list. The footer is used for referencing issue trackers or indicating breaking changes. A `BREAKING CHANGE:` footer is optional and MUST only be used when a commit introduces a breaking API change.
+  - _Example_:
 
       ```git
       feat(api): allow users to upload profile picture
@@ -42,17 +42,17 @@ If, and only if, you are operating within a Git repository (i.e., a `.git` direc
 ### 📜 Workspace & History
 
 - **Gather Context**: You are expected to use Git commands to understand the project's state and history before making changes.
-    - `git status` to see your current changes.
-    - `git log --oneline -n 10` to review recent commits.
-    - `git diff HEAD` to review your uncommitted changes.
-    - `git blame <file>` to understand the history of a specific piece of code.
+  - `git status` to see your current changes.
+  - `git log --oneline -n 10` to review recent commits.
+  - `git diff HEAD` to review your uncommitted changes.
+  - `git blame <file>` to understand the history of a specific piece of code.
 - **Reverting Changes**: Do not be afraid to undo broken changes to return to a stable state.
-    - To discard uncommitted changes to a single file: `git restore <file>`.
-    - As a last resort, if your changes on the branch have become hopelessly tangled, reset to a clean state with `git reset --hard HEAD`. This is a destructive action; use it as an escape hatch only when your current approach has failed and you need to restart the work on the branch.
+  - To discard uncommitted changes to a single file: `git restore <file>`.
+  - As a last resort, if your changes on the branch have become hopelessly tangled, reset to a clean state with `git reset --hard HEAD`. This is a destructive action; use it as an escape hatch only when your current approach has failed and you need to restart the work on the branch.
 
 ### 🚢 Merging & Completion
 
-Your work on a branch is not complete until it is successfully and safely integrated into the primary branch (`main`, `develop`).
+Your work on a branch is not complete until it is successfully and safely integrated into the repository's primary branch.
 
 #### Definition of Done
 
@@ -60,20 +60,20 @@ Before a branch can be considered ready for merging, it MUST meet all of the fol
 
 - **✅ Functionality Complete**: All requirements of the task have been implemented.
 - **✅ All Tests Passing**: The entire test suite (unit, integration, etc.) runs successfully against the most recent code.
-- **✅ Up-to-Date**: The feature branch has been recently synced with the target branch (e.g., `main`), and all conflicts have been resolved.
+- **✅ Up-to-Date**: The feature branch has been recently synced with the target branch, and all conflicts have been resolved.
 - **✅ Quality Standards Met**: The code adheres to all principles outlined in the `Coding Instructions` section.
 
 #### The Merge Process
 
 The standard process for merging is through a **Pull Request (PR)** or **Merge Request (MR)**. You MUST always prefer this over a direct local merge.
 
-1. **Sync Branch**: Before creating a Pull Request, you must update your feature branch with the latest changes from the target branch (e.g., `main`). This ensures your changes work with the most recent version of the codebase. A rebase is required to maintain a clean, linear project history.
+1. **Sync Branch**: Before creating a Pull Request, you must first programmatically determine the repository's primary branch (e.g., `main`, `master`, `develop`). You can typically do this by running `git remote show origin` and checking the `HEAD branch`. Once identified, you must update your feature branch with the latest changes from this primary branch. A rebase is required to maintain a clean, linear project history.
     - `git fetch origin`
-    - `git rebase origin/main` (replace `main` with the correct target branch)
+    - `git rebase origin/<primary-branch-name>`
 2. **Final Verification**: After syncing, run the full test suite one last time on your branch to guarantee nothing has broken.
 3. **Create Pull Request**:
     - Push your rebased branch to the remote repository: `git push --force-with-lease origin HEAD`.
-      - _Note_: A force push is required because rebasing rewrites commit history. `--force-with-lease` is a safer alternative to `--force` as it won't overwrite work if someone else has pushed to the branch. This command must NEVER be used on `main` or `develop`.
+        - _Note_: A force push is required because rebasing rewrites commit history. `--force-with-lease` is a safer alternative to `--force` as it won't overwrite work if someone else has pushed to the branch. This command must NEVER be used on the repository's primary branch.
     - Create a Pull Request targeting the primary branch. The PR title should be concise and the body should summarize your commits.
 4. **Await Review & Merge**: After creating the PR, you will notify the user and await a code review and merge. You WILL NOT merge your own PR unless explicitly instructed to do so and only if all automated status checks have passed.
 5. **Clean Up**: After the PR is merged, the feature branch on the remote can be deleted. You may also delete your local copy.
@@ -194,28 +194,24 @@ _Follow this workflow if you **DO** have access to specialized agents. You will 
 
 1. **Phase 1: Plan & Delegate**
     - **A. Clarify Goal**: Create a "Statement of Work" with verifiable acceptance criteria for the overall task.
-    - **B. Decompose & Assign**: Break the high-level goal into a series of sub-tasks and assign each to the most appropriate specialist agent. Create a dependency graph for these tasks.
-        - _Example Task -> Agent Mapping_:
-            - "Research libraries for X" -> `ResearchAgent`
-            - "Write tests for feature Y" -> `QAAgent`
-            - "Implement feature Y based on tests" -> `DeveloperAgent` (or self)
-            - "Scan for security vulnerabilities" -> `SecurityAgent`
-            - "Update documentation" -> `DocsAgent`
-    - **C. Setup Branch**: Create a single feature branch for all agents to work on.
-    - **D. Dispatch**: Dispatch tasks to specialist agents. Tasks that do not depend on each other may be dispatched in parallel.
+    - **B. Create Task Dependency Graph**: Break the goal into a series of granular sub-tasks. Crucially, you must map out the dependencies between these tasks (e.g., Task C requires Task A and B to be complete).
+    - **C. Setup Main Branch**: Create the primary feature branch for the overall task (e.g., `feat/new-user-profile`).
+    - **D. Dispatch & Manage Sub-Branches**:
+        - For each task in your dependency graph, assign it to the most appropriate specialist agent.
+        - For each dispatched task, create a dedicated sub-branch from the main feature branch (e.g., `feat/new-user-profile/api`). The specialist agent will work exclusively on this sub-branch.
+        - Dispatch tasks that have no unmet dependencies. These may be worked on in parallel by multiple agents.
 
-2. **Phase 2: Integrate & Verify**
-    - As each agent completes a task and commits its work to the branch, you are responsible for integrating and verifying it.
-    - After each agent's commit, you WILL run the _entire_ test suite to ensure no regressions were introduced.
+2. **Phase 2: Integrate Sub-Branches**
+    - As specialist agents complete their work on sub-branches, they will open Pull Requests back to the **main feature branch**.
+    - Your role is to review these PRs. Verify their work meets quality standards and run all tests.
+    - If the PR is valid, merge it into the main feature branch. After merging, run the full test suite again on the main feature branch to ensure successful integration.
 
 3. **Phase 3: Manage Failures**
-    - If an agent's work causes a test failure or is otherwise incorrect, you must manage the correction process.
-    - This may involve fixing the issue yourself (a tactical fix), re-delegating the task with more context about the failure, or reverting the flawed work and re-evaluating that part of the plan (a strategic reset).
-    - The same "Global Stop" limit (e.g., 25 total commits from all agents) applies to the overall effort.
+    - If an agent's PR fails verification, you must decline it and re-delegate the task to the agent with feedback on the failure.
+    - If an agent reports it is blocked, or if a sub-task repeatedly fails integration, apply the tiered self-correction logic to that sub-task (e.g., attempt a tactical fix yourself, or reset that line of work and re-plan it with a different approach).
 
 4. **Phase 4: Complete**
-    - Once all sub-tasks are complete and the final, integrated codebase passes all checks in the `Definition of Done`, follow the `Merging & Completion` workflow to create a Pull Request.
-    - The PR summary should attribute work to the specialist agents involved.
+    - Once all sub-branch PRs have been successfully merged into the main feature branch and it passes all checks in the `Definition of Done`, you will then follow the `Merging & Completion` workflow to create the final Pull Request from the main feature branch to the repository's primary branch.
 
 ## 🩹 Applying Patches & Diffs
 
@@ -242,17 +238,17 @@ This repository uses a centralized setup script to manage dependencies. To set u
 
 Testing is handled by simple, executable scripts in the `scripts/` directory. These scripts use `uv run` to execute `pytest` with the correct configuration.
 
-| Task                                          | Command              |
-| :-------------------------------------------- | :------------------- |
-| **Run all tests (parallel)** | `./scripts/test`     |
-| **Run tests for `site_downloader`** | `./scripts/test-sd`  |
-| **Run tests for `yt_bulk_cc`** | `./scripts/test-ybc` |
+| Task                                                                     | Command                                     |
+| :----------------------------------------------------------------------- | :------------------------------------------ |
+| **Run all tests (parallel)**                                             | `./scripts/test`                            |
+| **Run tests for `site_downloader`**                                      | `./scripts/test-sd`                         |
+| **Run tests for `yt_bulk_cc`**                                           | `./scripts/test-ybc`                        |
 | **Pass extra arguments to `pytest`**<br>_e.g., run a specific test file_ | `./scripts/test -k "test_specific_feature"` |
 
 To run tests with coverage, you can add the `--cov` flag:
 
--   `./scripts/test --cov`
--   `./scripts/test-sd --cov=site_downloader`
+- `./scripts/test --cov`
+- `./scripts/test-sd --cov=site_downloader`
 
 ## Troubleshooting
 
