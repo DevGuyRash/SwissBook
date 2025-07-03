@@ -228,25 +228,25 @@ These commands operate on all packages within the workspace.
 | Task                                                                              | Command           |
 | :-------------------------------------------------------------------------------- | :---------------- |
 | **Run all tests (sequential)**<br>_Good for debugging._                           | `uv run test`     |
-| **Run all tests (parallel)**<br>_Faster; for general use._                        | `uv run test:par` |
+| **Run all tests (parallel)**<br>_Faster; for general use._                        | `uv run test-par` |
 | **Run full coverage report (parallel)**<br>_Generates terminal and HTML reports._ | `uv run cov-all`  |
 
 ### Package-Specific Commands
 
 For convenience, dedicated aliases exist to test each package individually. This is the recommended way to run tests for a single package.
 
-| Task                                          | Command           |
-| :-------------------------------------------- | :---------------- |
-| Test `site_downloader` (sequential)           | `uv run test:sd`  |
-| Run coverage for `site_downloader` (parallel) | `uv run cov:sd`   |
-| Test `yt_bulk_cc` (sequential)                | `uv run test:ybc` |
-| Run coverage for `yt_bulk_cc` (parallel)      | `uv run cov:ybc`  |
+| Task                                             | Command           |
+| :----------------------------------------------- | :---------------- |
+| Test `site_downloader` (sequential)              | `uv run test-sd`  |
+| Run coverage for `site_downloader` (parallel)    | `uv run cov-sd`   |
+| Test `yt_bulk_cc` (sequential)                   | `uv run test-ybc` |
+| Run coverage for `yt_bulk_cc` (parallel)         | `uv run cov-ybc`  |
 
 ### Execution Modes & Targeting
 
-- **Sequential vs. Parallel**: For workspace commands, the `:par` suffix runs tests in parallel. For package-specific commands, the `cov*:` scripts run in parallel for speed, while the `test*:` scripts run sequentially for easier debugging.
-- **Targeting Packages**: Using the dedicated aliases (e.g., `uv run test:sd`) is the preferred method for testing a single package. However, you can still append a path to a general command (e.g., `uv run test packages/site_downloader`).
-- **Coverage Reports**: The `cov-all` command generates a report for the entire workspace. The package-specific `cov*:` aliases generate reports only for that package. All HTML output is located in the root `htmlcov/` directory.
+-   **Sequential vs. Parallel**: For workspace commands, the `-par` suffix runs tests in parallel. For package-specific commands, the `cov-*` scripts run in parallel for speed, while the `test-*` scripts run sequentially for easier debugging.
+-   **Targeting Packages**: Using the dedicated aliases (e.g., `uv run test-sd`) is the preferred method for testing a single package.
+-   **Coverage Reports**: The `cov-all` command generates a report for the entire workspace. The package-specific `cov-*` aliases generate reports only for that package. All HTML output is located in the root `htmlcov/` directory.
 
 ## Troubleshooting
 
