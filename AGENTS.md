@@ -158,19 +158,15 @@ The following rules apply _only_ when you are given a patch or diff file as inpu
 
 ## Environment Setup
 
-This repository uses a centralized setup script to manage dependencies. To set up the development environment:
+This repository uses a centralized setup script to manage dependencies. To set up the development environment (from project root):
 
 ```bash
 # Install all packages with development dependencies
-./setup.sh --dev
+./scripts/setup.sh --dev
 
 # Or for production use (minimal dependencies):
-# ./setup.sh --prod
+# ./scripts/setup.sh --prod
 ```
-
-## Running Tests
-
-Tests are managed via `uv` scripts defined in the root `pyproject.toml`, providing a simple and consistent interface. These scripts leverage a centralized `pytest` configuration for all packages in the workspace.
 
 ## Running Tests
 
