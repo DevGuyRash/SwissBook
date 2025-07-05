@@ -1199,12 +1199,6 @@ async def _main() -> None:
 
 async def main() -> None:
     """Entry point used by both CLI and tests."""
-    if sys.platform.startswith("linux"):
-        with contextlib.suppress(ModuleNotFoundError):
-            import uvloop
-
-            uvloop.install()
-
     def _sigint(signum, frame):
         raise KeyboardInterrupt
 
@@ -1220,4 +1214,12 @@ async def main() -> None:
 
 # ────────────────────────── bootstrap ────────────────────────────────
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        # Use uvloop for performance on Linux, but fall back gracefully
+        # if it's not installed or we're on another OS.
+        if not sys.platform.startswith("linux"):
+            raise ModuleNotFoundError()
+        import uvloop
+        uvloop.run(main())
+    except ModuleNotFoundError:
+        asyncio.run(main())
