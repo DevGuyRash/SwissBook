@@ -1079,8 +1079,10 @@ async def _main() -> None:
             for v in videos:
                 vid = v["videoId"]
                 for _, v_ok, title in ok:
-                    if v_ok == vid: break
-                else: continue
+                    if v_ok == vid:
+                        break
+                else:
+                    continue
                 try:
                     src = next(out_dir.glob(f"*[{vid}]*.{EXT[args.format]}"))
                 except StopIteration:
@@ -1091,14 +1093,39 @@ async def _main() -> None:
                 except Exception as e:
                     logging.warning("Skip unreadable file %s (%s)", src.name, e)
                     continue
-                piece = SEP(vid, title)+txt+"\n"
+                piece = SEP(vid, title) + txt + "\n"
                 w_p, l_p, c_p = _stats(piece)
-                exceed = (split_limit and (
-                          (split_unit=="w" and w_tot+w_p>split_limit) or
-                          (split_unit=="l" and l_tot+l_p>split_limit) or
-                          (split_unit=="c" and c_tot+c_p>split_limit)))
+                pred_meta = meta_list + [(vid, title)]
+                body_w = w_tot + w_p
+                body_l = l_tot + l_p
+                body_c = c_tot + c_p
+                if args.stats:
+                    _, pred_w, pred_l, pred_c = _fixup_loop(
+                        (body_w, body_l, body_c), args.format, pred_meta
+                    )
+                else:
+                    pred_w, pred_l, pred_c = body_w, body_l, body_c
+
+                exceed = (
+                    split_limit
+                    and (
+                        (split_unit == "w" and pred_w > split_limit)
+                        or (split_unit == "l" and pred_l > split_limit)
+                        or (split_unit == "c" and pred_c > split_limit)
+                    )
+                )
                 if exceed and (w_tot or l_tot or c_tot):
                     _rollover()
+                    pred_meta = [(vid, title)]
+                    body_w = w_p
+                    body_l = l_p
+                    body_c = c_p
+                    if args.stats:
+                        _, pred_w, pred_l, pred_c = _fixup_loop(
+                            (body_w, body_l, body_c), args.format, pred_meta
+                        )
+                    else:
+                        pred_w, pred_l, pred_c = body_w, body_l, body_c
                 dst.write(piece)
                 meta_list.append((vid, title))
                 w_tot += w_p; l_tot += l_p; c_tot += c_p
@@ -1170,16 +1197,21 @@ async def _main() -> None:
         sys.exit(2)
 
 
-def main():
+async def main() -> None:
+    """Entry point used by both CLI and tests."""
     if sys.platform.startswith("linux"):
         with contextlib.suppress(ModuleNotFoundError):
-            import uvloop; uvloop.install()
+            import uvloop
 
-    def _sigint(signum, frame): raise KeyboardInterrupt
+            uvloop.install()
+
+    def _sigint(signum, frame):
+        raise KeyboardInterrupt
+
     signal.signal(signal.SIGINT, _sigint)
 
     try:
-        asyncio.run(_main())
+        await _main()
     except KeyboardInterrupt:
         logging.warning("Interrupted by user")
         print(f"\n{C.BLU}Aborted by user{C.END}")
@@ -1188,4 +1220,4 @@ def main():
 
 # ────────────────────────── bootstrap ────────────────────────────────
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
