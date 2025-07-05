@@ -1212,8 +1212,8 @@ async def main() -> None:
         sys.exit(130)
 
 
-# ────────────────────────── bootstrap ────────────────────────────────
-if __name__ == "__main__":
+def cli_entry():
+    """Synchronous entry point for the console script."""
     try:
         # Use uvloop for performance on Linux, but fall back gracefully
         # if it's not installed or we're on another OS.
@@ -1223,3 +1223,8 @@ if __name__ == "__main__":
         uvloop.run(main())
     except ModuleNotFoundError:
         asyncio.run(main())
+
+
+# ────────────────────────── bootstrap ────────────────────────────────
+if __name__ == "__main__":
+    cli_entry()
