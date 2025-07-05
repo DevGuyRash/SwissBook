@@ -47,6 +47,7 @@ del _imp, _ModuleType, _sys, _legacy, _name
 # ---------------------------------------------------------------------------
 from .utils import slug, stats as _stats, detect, shorten_path as _shorten_for_windows  # noqa: E402
 from .formatters import TimeStampedText, FMT, EXT  # noqa: E402
+from .converter import convert_existing  # noqa: E402
 
 globals().update({
     "slug": slug,
