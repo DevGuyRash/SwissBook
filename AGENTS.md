@@ -8,8 +8,8 @@ If, and only if, you are operating within a Git repository (i.e., a `.git` direc
 
 1. **Check for Existing Branch**: Before starting, check your current branch with `git branch --show-current`. If it appears to be a feature branch already created for the current task (e.g., `feat/new-login-page`), you must continue your work there to avoid duplication.
 2. **Create a New Branch**: If you are on a primary branch like `main`, `master`, or `develop`, you MUST create a new branch before making any file modifications.
-    - Branch names MUST be descriptive and follow this pattern: `<type>/<short-description>` (e.g., `feat/user-auth-api`, `fix/incorrect-password-error`). The `type` should align with Conventional Commit types.
-    - Use `git checkout -b <branch-name>` to create and switch to the new branch.
+  - Branch names MUST be descriptive and follow this pattern: `<type>/<short-description>` (e.g., `feat/user-auth-api`, `fix/incorrect-password-error`). The `type` should align with Conventional Commit types.
+  - Use `git checkout -b <branch-name>` to create and switch to the new branch.
 
 ### COMMIT Committing Changes
 
@@ -17,27 +17,27 @@ If, and only if, you are operating within a Git repository (i.e., a `.git` direc
 - **Conventional Commits**: All commit messages MUST adhere strictly to the [Conventional Commits v1.0.0 specification](https://www.conventionalcommits.org/en/v1.0.0/).
   - _Format_:
 
-      ```git
-      <type>[optional scope]: <description>
+    ```
+    <type>[optional scope]: <description>
 
-      [optional body]
+    [optional body]
 
-      [optional footer(s)]
-      ```
+    [optional footer(s)]
+    ```
 
   - _Details_: The body should provide additional context, ideally as a bulleted list. The footer is used for referencing issue trackers or indicating breaking changes. A `BREAKING CHANGE:` footer is optional and MUST only be used when a commit introduces a breaking API change.
   - _Example_:
 
-      ```git
-      feat(api): allow users to upload profile picture
+    ```
+    feat(api): allow users to upload profile picture
 
-      - Implements the server-side logic for handling image uploads.
-      - Adds a new POST route at `/api/users/avatar`.
-      - Updates the user profile response model to include the new avatar URL.
+    - Implements the server-side logic for handling image uploads.
+    - Adds a new POST route at `/api/users/avatar`.
+    - Updates the user profile response model to include the new avatar URL.
 
-      BREAKING CHANGE: The user profile endpoint response now includes
-      an `avatarUrl` field instead of `pictureUrl`.
-      ```
+    BREAKING CHANGE: The user profile endpoint response now includes
+    an `avatarUrl` field instead of `pictureUrl`.
+    ```
 
 ### 📜 Workspace & History
 
@@ -68,13 +68,13 @@ Before a branch can be considered ready for merging, it MUST meet all of the fol
 The standard process for merging is through a **Pull Request (PR)** or **Merge Request (MR)**. You MUST always prefer this over a direct local merge.
 
 1. **Sync Branch**: Before creating a Pull Request, you must first programmatically determine the repository's primary branch (e.g., `main`, `master`, `develop`). You can typically do this by running `git remote show origin` and checking the `HEAD branch`. Once identified, you must update your feature branch with the latest changes from this primary branch. A rebase is required to maintain a clean, linear project history.
-    - `git fetch origin`
-    - `git rebase origin/<primary-branch-name>`
+  - `git fetch origin`
+  - `git rebase origin/<primary-branch-name>`
 2. **Final Verification**: After syncing, run the full test suite one last time on your branch to guarantee nothing has broken.
 3. **Create Pull Request**:
-    - Push your rebased branch to the remote repository: `git push --force-with-lease origin HEAD`.
-        - _Note_: A force push is required because rebasing rewrites commit history. `--force-with-lease` is a safer alternative to `--force` as it won't overwrite work if someone else has pushed to the branch. This command must NEVER be used on the repository's primary branch.
-    - Create a Pull Request targeting the primary branch. The PR title should be concise and the body should summarize your commits.
+  - Push your rebased branch to the remote repository: `git push --force-with-lease origin HEAD`.
+    - _Note_: A force push is required because rebasing rewrites commit history. `--force-with-lease` is a safer alternative to `--force` as it won't overwrite work if someone else has pushed to the branch. This command must NEVER be used on the repository's primary branch.
+  - Create a Pull Request targeting the primary branch. The PR title should be concise and the body should summarize your commits.
 4. **Await Review & Merge**: After creating the PR, you will notify the user and await a code review and merge. You WILL NOT merge your own PR unless explicitly instructed to do so and only if all automated status checks have passed.
 5. **Clean Up**: After the PR is merged, the feature branch on the remote can be deleted. You may also delete your local copy.
 
@@ -141,6 +141,13 @@ You MUST decompose complex logic into smaller, highly-cohesive, and loosely-coup
 - Favor a series of small, verifiable changes over a "big bang" rewrite.
 - If you identify a major architectural issue not directly related to the task, complete the task first, then recommend the larger refactor as a separate action.
 
+#### 🔬 Scoping Improvement Tasks
+
+- When given a vague task to "improve," "fix," or "refactor" a piece of code, you must not act immediately. Your first step is to define the scope to avoid over-engineering.
+- You will analyze the code and produce a prioritized, bulleted list of concrete, potential improvements.
+- For each item, you must provide a brief justification (e.g., "Refactor `userService` to use dependency injection to improve testability.").
+- You MUST present this list to the user for approval and ask which items you should proceed with before making any changes.
+
 ### ⚙️ Robustness & Reliability
 
 #### 🚨 Error Handling
@@ -167,51 +174,55 @@ Be mindful of complexity but AVOID premature optimization.
 
 ## 🤖 Unattended Development Cycle
 
-This is an advanced mode of operation. You WILL enter this cycle only when explicitly instructed to perform "unattended development" or a similarly phrased autonomous task.
+This is an advanced mode of operation. You WILL enter this cycle only when explicitly instructed to perform "unattended development" or a similarly phrased autonomous task. A global stop limit of 25 attempts (measured by commits or file-save checkpoints) applies and should be configurable.
 
-**Initial Check**: You must first determine if you have access to a pool of specialized agents (e.g., `QAAgent`, `SecurityAgent`, `DocsAgent`). Your workflow will change based on the result.
-
----
-
-### Single-Agent Workflow
-
-_Follow this workflow if you **DO NOT** have access to specialized agents._
-
-1. **Clarify & Plan**:
-    - **A. Clarify Goal**: First, restate the user's request in your own words as a clear "Statement of Work." This statement MUST include a bulleted list of specific, verifiable acceptance criteria. If the request is ambiguous, you MUST ask clarifying questions before proceeding.
-    - **B. Create Plan**: Once the goal is clear, decompose it into a high-level plan of testable features or tasks. For each feature, you MUST first perform the **Discovery Phase** as defined in the `Discovery & Dependency Strategy` section.
-    - **C. Setup Branch**: After the plan is finalized, create your branch according to the Git Workflow.
-2. **Execute**: For each task in your plan, execute the TDD cycle. Commit after each successful cycle.
-3. **Verify**: After each commit, run the _entire_ test suite to ensure no regressions were introduced.
-4. **Self-Correct**: If any test fails, apply the tiered self-correction logic (Tactical Fix -> Strategic Reset -> Global Stop).
-5. **Complete**: Once all tasks are done and all tests pass, follow the `Merging & Completion` workflow to create a Pull Request.
+**Initial Environment Check**: You must first determine if you are operating within a Git repository. Your workflow depends on this.
 
 ---
 
-### Multi-Agent Workflow
+### Git-Based Workflow
 
-_Follow this workflow if you **DO** have access to specialized agents. You will act as the **Orchestrator Agent**._
+_Follow this workflow if you **ARE** operating within a Git repository._
 
-1. **Phase 1: Plan & Delegate**
-    - **A. Clarify Goal**: Create a "Statement of Work" with verifiable acceptance criteria for the overall task.
-    - **B. Create Task Dependency Graph**: Break the goal into a series of granular sub-tasks. Crucially, you must map out the dependencies between these tasks (e.g., Task C requires Task A and B to be complete).
-    - **C. Setup Main Branch**: Create the primary feature branch for the overall task (e.g., `feat/new-user-profile`).
-    - **D. Dispatch & Manage Sub-Branches**:
-        - For each task in your dependency graph, assign it to the most appropriate specialist agent.
-        - For each dispatched task, create a dedicated sub-branch from the main feature branch (e.g., `feat/new-user-profile/api`). The specialist agent will work exclusively on this sub-branch.
-        - Dispatch tasks that have no unmet dependencies. These may be worked on in parallel by multiple agents.
+**Multi-Agent Check**: Before planning, determine if you have access to a pool of specialized agents.
 
-2. **Phase 2: Integrate Sub-Branches**
-    - As specialist agents complete their work on sub-branches, they will open Pull Requests back to the **main feature branch**.
-    - Your role is to review these PRs. Verify their work meets quality standards and run all tests.
-    - If the PR is valid, merge it into the main feature branch. After merging, run the full test suite again on the main feature branch to ensure successful integration.
+- **If you DO NOT have access to specialized agents (Single-Agent mode)**:
+  1. **Clarify & Plan**: Create a "Statement of Work" with acceptance criteria. Decompose this into a plan of testable features, performing the **Discovery Phase** for each. Create your feature branch.
+  2. **Execute**: Execute the TDD cycle for each task, committing after each success.
+  3. **Verify**: Run the full test suite after each commit.
+  4. **Self-Correct**: If tests fail, apply the tiered self-correction logic (Tactical Fix -> Strategic Reset -> Global Stop).
+  5. **Complete**: When all tasks are done, create a Pull Request.
 
-3. **Phase 3: Manage Failures**
-    - If an agent's PR fails verification, you must decline it and re-delegate the task to the agent with feedback on the failure.
-    - If an agent reports it is blocked, or if a sub-task repeatedly fails integration, apply the tiered self-correction logic to that sub-task (e.g., attempt a tactical fix yourself, or reset that line of work and re-plan it with a different approach).
+- **If you DO have access to specialized agents (Multi-Agent Orchestrator mode)**:
+  1. **Plan & Delegate**: Create a "Statement of Work," decompose it into a task dependency graph, and create a primary feature branch.
+  2. **Dispatch**: Create dedicated sub-branches for parallelizable tasks and dispatch them to specialist agents.
+  3. **Integrate**: As agents complete work, manage and merge their PRs into the main feature branch, running tests after each integration.
+  4. **Manage Failures**: Handle failed or blocked tasks by re-delegating with more context or resetting that line of work.
+  5. **Complete**: When all sub-tasks are integrated, create the final Pull Request from the main feature branch to the repository's primary branch.
 
-4. **Phase 4: Complete**
-    - Once all sub-branch PRs have been successfully merged into the main feature branch and it passes all checks in the `Definition of Done`, you will then follow the `Merging & Completion` workflow to create the final Pull Request from the main feature branch to the repository's primary branch.
+---
+
+### Filesystem-Based Workflow
+
+_Follow this workflow if you **ARE NOT** operating within a Git repository. This mode is inherently single-agent._
+
+1. **Setup Sandbox & Backup**:
+  - **A. Create Sandbox**: First, create a temporary working directory (e.g., in `/tmp/`). All work will occur here.
+  - **B. Create Master Backup**: Before touching any files, create a complete, timestamped backup of all files relevant to the task and place them in a safe location outside your sandbox. This is your ultimate recovery point.
+  - **C. Copy to Sandbox**: Copy the original files into your sandbox directory.
+2. **Clarify & Plan**:
+  - Create a "Statement of Work" with verifiable acceptance criteria.
+  - Decompose the goal into a series of smaller, verifiable tasks.
+3. **Execution & Checkpointing Loop**:
+  - For each task in your plan:
+    1. **Create Checkpoint**: Before modifying a file (e.g., `main.py`), create a versioned backup *within your sandbox* (e.g., `main.py.bak.1`). This is your tactical checkpoint.
+    2. **Execute**: Modify the code in the sandbox to implement the change.
+    3. **Verify**: Run the relevant tests against the modified code.
+    4. **Self-Correct**: If a test fails, restore the file from its most recent checkpoint (e.g., `cp main.py.bak.1 main.py`) and re-attempt the implementation with a different approach. The tiered logic of tactical fixes and strategic resets still applies.
+4. **Completion & Delivery**:
+  - Once all tasks are complete and all tests pass on the files within your sandbox:
+    - **A. Generate Patch**: You MUST generate a single patch file that represents all the changes between the **master backup** and the final, modified files in your sandbox. Use `diff -Naur master_backup_directory/ sandbox_directory/ > final_changes.patch`.
+    - **B. Report**: Present this `final_changes.patch` file to the user as the result of your work. You MUST NOT overwrite the user's original files. You will provide the patch and await instructions to apply it.
 
 ## 🩹 Applying Patches & Diffs
 
