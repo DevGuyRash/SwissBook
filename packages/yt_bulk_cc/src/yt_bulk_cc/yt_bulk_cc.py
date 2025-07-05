@@ -1214,15 +1214,20 @@ async def main() -> None:
 
 def cli_entry():
     """Synchronous entry point for the console script."""
+    if sys.platform.startswith("linux"):
+        try:
+            import uvloop
+            uvloop.install()
+        except ModuleNotFoundError:
+            pass  # Fallback to standard asyncio
+
     try:
-        # Use uvloop for performance on Linux, but fall back gracefully
-        # if it's not installed or we're on another OS.
-        if not sys.platform.startswith("linux"):
-            raise ModuleNotFoundError()
-        import uvloop
-        uvloop.run(main())
-    except ModuleNotFoundError:
         asyncio.run(main())
+    except KeyboardInterrupt:
+        # The `main` function has its own handler, but this is a fallback
+        # for interrupts that occur before the event loop is running.
+        print(f"\n{C.BLU}Aborted by user{C.END}")
+        sys.exit(130)
 
 
 # ────────────────────────── bootstrap ────────────────────────────────

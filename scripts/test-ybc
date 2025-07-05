@@ -2,4 +2,4 @@
 # Runs all tests for the yt_bulk_cc package.
 set -euo pipefail
 cd "$(dirname "$0")/.." # Go to project root
-uv run pytest -n auto packages/yt_bulk_cc "$@" 
+uv run --all-extras pytest -n auto packages/yt_bulk_cc "$@" 

@@ -2,4 +2,4 @@
 # Runs all tests for the entire workspace, in parallel.
 set -euo pipefail
 cd "$(dirname "$0")/.." # Go to project root
-uv run pytest -n auto "$@" 
+uv run --all-extras pytest -n auto "$@" 

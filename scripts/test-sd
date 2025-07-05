@@ -2,4 +2,4 @@
 # Runs all tests for the site_downloader package.
 set -euo pipefail
 cd "$(dirname "$0")/.." # Go to project root
-uv run pytest -n auto packages/site_downloader "$@" 
+uv run --all-extras pytest -n auto packages/site_downloader "$@" 
