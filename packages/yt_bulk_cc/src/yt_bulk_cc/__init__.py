@@ -48,6 +48,14 @@ del _imp, _ModuleType, _sys, _legacy, _name
 from .utils import slug, stats as _stats, detect, shorten_path as _shorten_for_windows  # noqa: E402
 from .formatters import TimeStampedText, FMT, EXT  # noqa: E402
 from .converter import convert_existing  # noqa: E402
+from .errors import (
+    CouldNotRetrieveTranscript,
+    NoTranscriptFound,
+    TranscriptsDisabled,
+    VideoUnavailable,
+    NoTranscriptAvailable,
+    TooManyRequests,
+)  # noqa: E402
 
 globals().update({
     "slug": slug,
@@ -57,9 +65,16 @@ globals().update({
     "TimeStampedText": TimeStampedText,
     "FMT": FMT,
     "EXT": EXT,
+    "convert_existing": convert_existing,
+    "CouldNotRetrieveTranscript": CouldNotRetrieveTranscript,
+    "NoTranscriptFound": NoTranscriptFound,
+    "TranscriptsDisabled": TranscriptsDisabled,
+    "VideoUnavailable": VideoUnavailable,
+    "NoTranscriptAvailable": NoTranscriptAvailable,
+    "TooManyRequests": TooManyRequests,
 })
 
 # Keep __all__ accurate
 __all__ = sorted(set(__all__) | {
-    "slug", "_stats", "detect", "_shorten_for_windows", "TimeStampedText", "FMT", "EXT"
+    "slug", "_stats", "detect", "_shorten_for_windows", "TimeStampedText", "FMT", "EXT", "convert_existing", "CouldNotRetrieveTranscript", "NoTranscriptFound", "TranscriptsDisabled", "VideoUnavailable", "NoTranscriptAvailable", "TooManyRequests"
 }) 
