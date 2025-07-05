@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-yt-bulk-cc = "yt_bulk_cc.yt_bulk_cc:cli_entry"
+yt-bulk-cc = "yt_bulk_cc.cli:cli_entry"
 
 [build-system]
 requires = ["uv", "setuptools>=68", "wheel"]
