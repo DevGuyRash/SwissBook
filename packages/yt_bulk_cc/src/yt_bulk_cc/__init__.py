@@ -41,3 +41,24 @@ __version__ = getattr(_legacy, "__version__", "0.0.0")
 
 # Tidy helper globals
 del _imp, _ModuleType, _sys, _legacy, _name 
+
+# ---------------------------------------------------------------------------
+# Prefer modular implementations over legacy copies where available
+# ---------------------------------------------------------------------------
+from .utils import slug, stats as _stats, detect, shorten_path as _shorten_for_windows  # noqa: E402
+from .formatters import TimeStampedText, FMT, EXT  # noqa: E402
+
+globals().update({
+    "slug": slug,
+    "_stats": _stats,
+    "detect": detect,
+    "_shorten_for_windows": _shorten_for_windows,
+    "TimeStampedText": TimeStampedText,
+    "FMT": FMT,
+    "EXT": EXT,
+})
+
+# Keep __all__ accurate
+__all__ = sorted(set(__all__) | {
+    "slug", "_stats", "detect", "_shorten_for_windows", "TimeStampedText", "FMT", "EXT"
+}) 
