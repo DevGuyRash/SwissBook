@@ -106,3 +106,21 @@ python -m yt_bulk_cc.yt_bulk_cc --convert ./out -f srt -o ./out_srt
 ## License
 
 MIT © SwissBook contributors
+
+## 🐍 Programmatic usage
+
+As of v1.1, `yt_bulk_cc` is a proper Python package.  Instead of importing
+from the giant legacy script, you can interact with focused, documented
+sub-modules:
+
+| Module                | Purpose                                      |
+| --------------------- | -------------------------------------------- |
+| `yt_bulk_cc.utils`    | Slugging, path shortening, URL detection, `stats()` helper |
+| `yt_bulk_cc.formatters` | `TimeStampedText` plus `FMT`/`EXT` registries |
+| `yt_bulk_cc.converter` | Convert downloaded JSON → SRT/WebVTT/Text, etc. |
+| `yt_bulk_cc.core`     | High-level async helpers: `grab()` and `video_iter()` |
+| `yt_bulk_cc.errors`   | Safe re-exports of transcript-API exception types |
+
+Backward-compatibility: `import yt_bulk_cc as ytb` still works and re-exports
+all public symbols, so existing code and the test-suite continue to run
+unchanged.
