@@ -591,7 +591,7 @@ async def _main() -> None:
                    help="Stop after N videos (handy for testing)")
     P.add_argument("-j", "--jobs", type=int, default=2,
                    help="Concurrent transcript downloads")
-    P.add_argument("-s", "--sleep", type=int, default=2,
+    P.add_argument("-s", "--sleep", type=int, default=3,
                    help="Seconds between scrapetube pagination calls")
     P.add_argument("-v", "--verbose", action="count", default=0,
                    help="-v=info, -vv=debug")
