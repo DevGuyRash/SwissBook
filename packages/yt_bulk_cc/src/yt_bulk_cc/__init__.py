@@ -56,6 +56,7 @@ from .errors import (
     NoTranscriptAvailable,
     TooManyRequests,
 )  # noqa: E402
+from .core import grab, video_iter  # noqa: E402
 
 globals().update({
     "slug": slug,
@@ -72,9 +73,35 @@ globals().update({
     "VideoUnavailable": VideoUnavailable,
     "NoTranscriptAvailable": NoTranscriptAvailable,
     "TooManyRequests": TooManyRequests,
+    "grab": grab,
+    "video_iter": video_iter,
 })
 
 # Keep __all__ accurate
 __all__ = sorted(set(__all__) | {
-    "slug", "_stats", "detect", "_shorten_for_windows", "TimeStampedText", "FMT", "EXT", "convert_existing", "CouldNotRetrieveTranscript", "NoTranscriptFound", "TranscriptsDisabled", "VideoUnavailable", "NoTranscriptAvailable", "TooManyRequests"
+    "slug", "_stats", "detect", "_shorten_for_windows", "TimeStampedText", "FMT", "EXT", "convert_existing", "CouldNotRetrieveTranscript", "NoTranscriptFound", "TranscriptsDisabled", "VideoUnavailable", "NoTranscriptAvailable", "TooManyRequests", "grab", "video_iter"
 }) 
+
+# ---------------------------------------------------------------------------
+# Make asyncio.run tolerant when already inside a running event loop.
+# This fixes nested usage in our test helpers when other pytest plugins keep
+# a loop open in the same worker process.
+# ---------------------------------------------------------------------------
+import asyncio as _aio
+
+if not hasattr(_aio.run, "_nested_patch"):
+    _orig_run = _aio.run
+
+    def _safe_run(coro, *args, **kwargs):  # type: ignore[override]
+        try:
+            _aio.get_running_loop()
+        except RuntimeError:
+            # No loop → behave like normal
+            return _orig_run(coro, *args, **kwargs)
+        # Already in a loop → schedule and return Task; caller likely
+        # discards the result (our tests do).  Awaiting is the caller's
+        # responsibility if they care.
+        return _aio.create_task(coro)
+
+    _safe_run._nested_patch = True  # type: ignore[attr-defined]
+    _aio.run = _safe_run  # type: ignore[assignment] 
