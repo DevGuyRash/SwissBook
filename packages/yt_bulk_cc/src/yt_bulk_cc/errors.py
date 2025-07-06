@@ -21,6 +21,8 @@ class _Placeholder(Exception):
 
 NoTranscriptAvailable = getattr(_errors, "NoTranscriptAvailable", _Placeholder)
 TooManyRequests = getattr(_errors, "TooManyRequests", _Placeholder)
+IpBlocked = getattr(_errors, "IpBlocked", _Placeholder)
+
 
 __all__ = [
     "CouldNotRetrieveTranscript",
@@ -29,4 +31,5 @@ __all__ = [
     "VideoUnavailable",
     "NoTranscriptAvailable",
     "TooManyRequests",
+    "IpBlocked",
 ] 

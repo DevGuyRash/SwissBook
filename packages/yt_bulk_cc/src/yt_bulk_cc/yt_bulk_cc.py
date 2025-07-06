@@ -49,28 +49,16 @@ from youtube_transcript_api import YouTubeTranscriptApi, formatters
 # ------------------------------------------------------------
 #  Robust error-class import — works on every library version
 # ------------------------------------------------------------
-from youtube_transcript_api._errors import (
+from .errors import (
     CouldNotRetrieveTranscript,
     NoTranscriptFound,
     TranscriptsDisabled,
     VideoUnavailable,
+    TooManyRequests,
+    IpBlocked,
 )
 
-# `NoTranscriptAvailable` was removed in 2024-plus releases.
-# Create a stub if it's missing so downstream `except` clauses stay valid.
-try:
-    from youtube_transcript_api._errors import NoTranscriptAvailable
-except ImportError:                          # fallback for new versions
-    class NoTranscriptAvailable(Exception):  # type: ignore
-        """Placeholder for backward compatibility."""
-        pass
 
-# Newer releases sometimes add throttling errors; define dummies if absent.
-try:
-    from youtube_transcript_api._errors import TooManyRequests
-except ImportError:
-    class TooManyRequests(Exception):        # type: ignore
-        pass
 
 # ───────────────────────── helpers ────────────────────────── #
 
@@ -396,17 +384,7 @@ async def grab(
                 if cookies and "cookies" in sig_params:
                     kwargs["cookies"] = cookies
 
-                # ───────────────────────── DEBUG A ─────────────────────────
-                logging.debug(
-                    "grab[%s] About to call .get_transcript - "
-                    "api=%r  sig=%s  kwargs=%s  NoTranscriptFound-id=%s",
-                    vid,
-                    YouTubeTranscriptApi,
-                    list(sig_params),
-                    kwargs,
-                    id(NoTranscriptFound),
-                )
-                # ────────────────────────────────────────────────────────────
+                
 
 
                 # returns a list of dicts
@@ -479,17 +457,7 @@ async def grab(
                              exc.__class__.__name__, wait, attempt, tries)
                 await asyncio.sleep(wait)
                 continue
-            except Exception as exc:
-                # ───────────────────────── DEBUG B ─────────────────────────
-                logging.debug(
-                    "grab[%s] caught %s  id=%s  isinstance(NoTranscriptFound)=%s  msg=%s",
-                    vid,
-                    exc.__class__.__name__,
-                    id(exc.__class__),
-                    isinstance(exc, NoTranscriptFound),
-                    exc,
-                )
-                # ────────────────────────────────────────────────────────────
+            
                 logging.debug("retry %s/%s for %s: %s", attempt, tries, vid, exc)
                 if attempt == tries:
                     logging.error("⚠ giving up on %s (%s)", vid, exc.__class__.__name__)

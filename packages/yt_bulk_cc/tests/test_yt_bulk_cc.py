@@ -22,9 +22,10 @@ import re
 # ---------------------------------------------------------------------------
 # ensure scripts/ is importable
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src" / "yt_bulk_cc"))
+sys.path.insert(0, str(ROOT / "src"))
 
-import yt_bulk_cc as ytb  # noqa: E402  (import after path tweak)
+from yt_bulk_cc import yt_bulk_cc as ytb
+from yt_bulk_cc.errors import IpBlocked, TooManyRequests, NoTranscriptFound
 
 # ────────────────────────── shared fixtures ────────────────────────────── #
 @pytest.fixture(autouse=True)
@@ -736,6 +737,35 @@ def test_retry_too_many_requests(monkeypatch, tmp_path: Path, capsys):
     assert list(tmp_path.glob("*.txt")), "no output after retries"
 
     # We should have attempted exactly three calls (two 429s + final success)
+    assert calls["n"] == 3, "back-off logic did not retry the expected number of times"
+
+
+@pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
+def test_retry_ip_blocked(monkeypatch, tmp_path: Path, capsys):
+    """_grab() must back-off and still succeed after transient IpBlocked errors."""
+
+    calls = {"n": 0}
+
+    def _fake_get_transcript(*_a, **_kw):
+        calls["n"] += 1
+        if calls["n"] < 3:  # first two attempts → fail
+            raise ytb.IpBlocked("IP blocked")
+        # third attempt → return minimal cue
+        return [{"start": 0.0, "duration": 1.0, "text": "OK"}]
+
+    monkeypatch.setattr(
+        ytb,
+        "YouTubeTranscriptApi",
+        type("FakeApi", (), {"get_transcript": staticmethod(_fake_get_transcript)}),
+    )
+
+    # -v → console log level INFO so the retry line reaches stdout
+    run_cli(tmp_path, "dummy", "-f", "text", "-n", "1", "-v")
+
+    # a file should have been produced after retries
+    assert list(tmp_path.glob("*.txt")), "no output after retries"
+
+    # We should have attempted exactly three calls (two IpBlocked + final success)
     assert calls["n"] == 3, "back-off logic did not retry the expected number of times"
 
 

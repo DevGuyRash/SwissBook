@@ -19,6 +19,8 @@ from youtube_transcript_api import YouTubeTranscriptApi
 from .errors import (
     NoTranscriptFound,
     TranscriptsDisabled,
+    TooManyRequests,
+    IpBlocked,
 )
 from .formatters import FMT
 from .utils import stats, detect, coerce_attr  # type: ignore[attr-defined]
@@ -104,6 +106,12 @@ async def grab(
             except (TranscriptsDisabled, NoTranscriptFound):
                 logging.warning("No subtitles for video %s", vid)
                 return ("none", vid, title)
+            except (TooManyRequests, IpBlocked, CouldNotRetrieveTranscript) as exc:
+                wait = 6 * attempt
+                logging.info("⏳ %s - retrying in %ss (attempt %s/%s)",
+                             exc.__class__.__name__, wait, attempt, tries)
+                await asyncio.sleep(wait)
+                continue
             except Exception as exc:
                 if attempt == tries:
                     logging.error("%s after %d tries – giving up", exc, attempt)
