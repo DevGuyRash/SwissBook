@@ -11,6 +11,7 @@ import hashlib
 import os
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 __all__ = [
     "BAD_REGEX",
@@ -18,6 +19,7 @@ __all__ = [
     "stats",
     "shorten_path",
     "detect",
+    "coerce_attr",
 ]
 
 # ---------------------------------------------------------------------------
@@ -77,6 +79,21 @@ def stats(txt: str) -> tuple[int, int, int]:
     lines = txt.count("\n")  # match `wc -l` semantics
     return words, lines, chars
 
+
+# ---------------------------------------------------------------------------
+# Cue adapter (dict → SimpleNamespace)
+# ---------------------------------------------------------------------------
+
+
+def coerce_attr(seq):
+    """Ensure each cue allows *attribute* access expected by formatters.
+
+    The *youtube_transcript_api* library returns a list of *dict*s by default.
+    Most *formatters* in yt_bulk_cc expect those items to expose ``.start`` and
+    ``.text`` attributes.  Wrapping each dict in :class:`types.SimpleNamespace`
+    preserves the original keys while enabling attribute-style access.
+    """
+    return [SimpleNamespace(**d) if isinstance(d, dict) else d for d in seq]
 
 # ---------------------------------------------------------------------------
 # YouTube URL detector
