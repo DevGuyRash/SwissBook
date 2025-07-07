@@ -15,6 +15,7 @@ from youtube_transcript_api.proxies import GenericProxyConfig
 from .user_agent import _pick_ua
 
 import scrapetube
+import time
 from youtube_transcript_api import YouTubeTranscriptApi
 
 from .errors import (
@@ -41,6 +42,7 @@ def probe_video(
     cookies: list | None = None,
     proxy_pool: list[str] | None = None,
     banned: set[str] | None = None,
+    tries: int = 3,  # Added tries parameter
 ) -> tuple[bool, set[str]]:
     """Return ``(ok, banned_proxies)`` after probing ``vid``."""
     banned = banned if banned is not None else set()
@@ -53,15 +55,25 @@ def probe_video(
             for c in cookies:
                 session.cookies.set(c.get("name"), c.get("value"))
         api = YouTubeTranscriptApi(proxy_config=proxy, http_client=session)
-        try:
-            api.fetch(vid, languages=["en"]).to_raw_data()
-            return True, banned
-        except (TooManyRequests, IpBlocked):
-            if url:
-                banned.add(url)
-            continue
-        except Exception:
-            return True, banned
+
+        for attempt in range(1, tries + 1):  # Retry loop
+            try:
+                api.fetch(vid, languages=["en"]).to_raw_data()
+                return True, banned
+            except (TooManyRequests, IpBlocked):
+                if url:
+                    banned.add(url)
+                wait = 6 * attempt  # Exponential backoff
+                logging.info(
+                    "⏳ Probe for %s - retrying in %ss (attempt %s/%s)",
+                    vid, wait, attempt, tries
+                )
+                time.sleep(wait)  # Use time.sleep for synchronous probe
+                continue
+            except Exception:
+                return True, banned  # Other errors are not considered IP blocks
+        if url:
+            banned.add(url) # If all retries fail, ban the proxy
     return False, banned
 
 
