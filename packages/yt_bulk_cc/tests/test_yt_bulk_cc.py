@@ -17,7 +17,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-import re
 
 # ---------------------------------------------------------------------------
 # ensure scripts/ is importable
@@ -26,6 +25,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from yt_bulk_cc import yt_bulk_cc as ytb
 from yt_bulk_cc.errors import IpBlocked, TooManyRequests, NoTranscriptFound
+from youtube_transcript_api.proxies import GenericProxyConfig, WebshareProxyConfig
 
 # ────────────────────────── shared fixtures ────────────────────────────── #
 @pytest.fixture(autouse=True)
@@ -866,3 +866,158 @@ def test_default_user_agent(monkeypatch, tmp_path: Path):
     run_cli(tmp_path, "https://youtu.be/vidX")
 
     assert captured["ua"] == "UA/123"
+
+
+def test_generic_proxy_flags(monkeypatch, tmp_path: Path):
+    """CLI should pass GenericProxyConfig with provided proxy URLs."""
+
+    monkeypatch.setattr(ytb, "detect", lambda _u: ("playlist", "X"))
+    monkeypatch.setattr(
+        ytb.scrapetube,
+        "get_playlist",
+        lambda *_a, **_k: [{"videoId": "x", "title": {"runs": [{"text": "d"}]}}],
+    )
+
+    captured = {}
+
+    class _FakeApi:
+        def __init__(self, *_, **kw):
+            captured["cfg"] = kw.get("proxy_config")
+
+        def fetch(self, *a, **kw):
+            class _FT:
+                def to_raw_data(self):
+                    return []
+
+            return _FT()
+
+    monkeypatch.setattr(ytb, "YouTubeTranscriptApi", _FakeApi)
+
+    run_cli(
+        tmp_path,
+        "dummy",
+        "-p",
+        "http://u:p@h:1",
+        "-n",
+        "1",
+    )
+
+    cfg = captured["cfg"]
+    assert isinstance(cfg, ytb.GenericProxyConfig)
+    assert cfg.http_url == "http://u:p@h:1"
+    assert cfg.https_url == "https://u:p@h:1"
+
+
+def test_webshare_proxy(monkeypatch, tmp_path: Path):
+    """CLI should use WebshareProxyConfig when credentials provided."""
+
+    monkeypatch.setattr(ytb, "detect", lambda _u: ("playlist", "X"))
+    monkeypatch.setattr(
+        ytb.scrapetube,
+        "get_playlist",
+        lambda *_a, **_k: [{"videoId": "x", "title": {"runs": [{"text": "d"}]}}],
+    )
+
+    captured = {}
+
+    class _FakeApi:
+        def __init__(self, *_, **kw):
+            captured["cfg"] = kw.get("proxy_config")
+
+        def fetch(self, *a, **kw):
+            class _FT:
+                def to_raw_data(self):
+                    return []
+
+            return _FT()
+
+    monkeypatch.setattr(ytb, "YouTubeTranscriptApi", _FakeApi)
+
+    run_cli(
+        tmp_path,
+        "dummy",
+        "-p",
+        "ws://user:pass",
+        "-n",
+        "1",
+    )
+
+    cfg = captured["cfg"]
+    assert isinstance(cfg, ytb.WebshareProxyConfig)
+    assert cfg.proxy_username == "user"
+    assert cfg.proxy_password == "pass"
+
+
+def test_proxy_pool(monkeypatch, tmp_path: Path):
+    """-p should populate proxy_pool with credentials intact."""
+
+    monkeypatch.setattr(ytb, "detect", lambda _u: ("playlist", "X"))
+    monkeypatch.setattr(
+        ytb.scrapetube,
+        "get_playlist",
+        lambda *_a, **_k: [{"videoId": "x", "title": {"runs": [{"text": "d"}]}}],
+    )
+
+    captured = {}
+
+    async def _fake_grab(*_a, **kw):
+        captured["pool"] = kw.get("proxy_pool")
+        return ("ok", "x", "t")
+
+    monkeypatch.setattr(ytb, "grab", _fake_grab)
+
+    run_cli(
+        tmp_path,
+        "dummy",
+        "-p",
+        "http://u:p@h:1,https://u2:p2@h2:2",
+        "-n",
+        "1",
+    )
+
+    assert captured["pool"] == ["http://u:p@h:1", "https://u2:p2@h2:2"]
+
+
+def test_pool_multiple_webshare(monkeypatch, tmp_path: Path):
+    """Multiple ws:// credentials should pass through to grab()."""
+
+    monkeypatch.setattr(ytb, "detect", lambda _u: ("playlist", "X"))
+    monkeypatch.setattr(
+        ytb.scrapetube,
+        "get_playlist",
+        lambda *_a, **_k: [{"videoId": "x", "title": {"runs": [{"text": "d"}]}}],
+    )
+
+    captured = {}
+
+    async def _fake_grab(*_a, **kw):
+        captured["pool"] = kw.get("proxy_pool")
+        return ("ok", "x", "t")
+
+    monkeypatch.setattr(ytb, "grab", _fake_grab)
+
+    run_cli(
+        tmp_path,
+        "dummy",
+        "-p",
+        "ws://u:p,ws://u2:p2",
+        "-n",
+        "1",
+    )
+
+    assert captured["pool"] == ["ws://u:p", "ws://u2:p2"]
+
+
+def test_make_proxy_ws():
+    """_make_proxy should return WebshareProxyConfig for ws:// URLs."""
+
+    from yt_bulk_cc.core import _make_proxy as core_make
+    from yt_bulk_cc.yt_bulk_cc import _make_proxy as cli_make
+
+    cfg1 = core_make("ws://aa:bb")
+    cfg2 = cli_make("ws://aa:bb")
+
+    for cfg in (cfg1, cfg2):
+        assert isinstance(cfg, ytb.WebshareProxyConfig)
+        assert cfg.proxy_username == "aa"
+        assert cfg.proxy_password == "bb"

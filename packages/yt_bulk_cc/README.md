@@ -90,8 +90,8 @@ python -m yt_bulk_cc.yt_bulk_cc --convert ./out -f srt -o ./out_srt
 | `-C`, `--concat`             | _[basename]_    | Concatenate all results into a single file with an optional basename.                                                            |
 | `--split`                    | _(e.g. 10000c)_ | With `--concat`, splits the output into new files when a size threshold is met.<br>Units: `w` (words), `l` (lines), `c` (chars). |
 | **Network & Authentication** |                 |                                                                                                                                  |
-| `-p`, `--proxy`              | _(url)_         | A single proxy URL or a comma-separated list to rotate through.                                                                  |
-| `--proxy-file`              | _(file)_        | Load proxies from a file (one URL per line). |
+| `-p`, `--proxy`              | _(url)_         | Single proxy URL or comma-separated list to rotate through. Use `ws://user:pass` for Webshare. |
+| `--proxy-file`              | _(file)_        | Load additional proxies from a file (one URL per line). |
 | `-c`, `--cookie-json`, `--cookie-file`        | _(file)_        | Cookies JSON exported with a browser extension (see below). |
 | `-s`, `--sleep`              | _(float)_       | Seconds to wait between playlist requests and after each transcript. Default: `2`. |
 | `--check-ip`                |                 | Preflight transcript fetch to detect IP bans before downloading. |
@@ -101,6 +101,10 @@ python -m yt_bulk_cc.yt_bulk_cc --convert ./out -f srt -o ./out_srt
 | `-v`, `--verbose`            |                 | Increase console log verbosity (`-v` for INFO, `-vv` for DEBUG).                                                                 |
 | `-L`, `--log-file`           | _(file)_        | Write a detailed run log to a specific file.                                                                                     |
 | `--no-log`                   |                 | Disable file logging entirely.                                                                                                   |
+### Proxy usage
+
+Use `-p`/`--proxy` and `--proxy-file` to provide a single proxy or a list of proxies rotated between requests. Each URL may include `user:pass` credentials. To use Webshare residential proxies pass `ws://USER:PASS` as the proxy URL.
+
 | `-F`, `--formats-help`       |                 | Show examples of each output format and exit.                                                                                    |
 
 ### Exporting cookies

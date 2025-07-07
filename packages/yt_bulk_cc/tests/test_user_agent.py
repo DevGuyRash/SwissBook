@@ -27,10 +27,10 @@ def test_ua_fallback():
         raise Exception("Network error")
 
     with patch('yt_bulk_cc.user_agent.UserAgent.__init__', side_effect=mock_init):
-        with patch('random.choice', return_value="fallback-ua") as mock_choice:
+        with patch('yt_bulk_cc.user_agent._Faker.user_agent', return_value="fallback-ua") as mock_faker:
             ua = _pick_ua()
             assert ua == "fallback-ua"
-            mock_choice.assert_called_once()
+            mock_faker.assert_called_once()
 
 
 def test_ua_no_filters():

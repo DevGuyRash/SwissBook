@@ -16,6 +16,7 @@ dependencies = [
     "uvloop>=0.21.0",
     "youtube-transcript-api>=1.1.1",
     "fake-useragent>=2.2",
+    "faker>=24.11",
 ]
 
 [project.scripts]
