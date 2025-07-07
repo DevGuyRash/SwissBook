@@ -810,3 +810,32 @@ def test_windows_path_shortening(monkeypatch, tmp_path: Path):
 
     shortened = ytb._shorten_for_windows(original)
     assert len(str(shortened)) <= 260, "path exceeds Windows MAX_PATH"
+
+
+# ---------------------------------------------------------------------------
+# 3. Ensure grab() uses a browser-like User-Agent
+# ---------------------------------------------------------------------------
+
+def test_default_user_agent(monkeypatch, tmp_path: Path):
+    """grab() should use a sensible User-Agent header by default."""
+
+    monkeypatch.setattr(ytb, "detect", lambda _u: ("video", "vidX"))
+
+    captured = {}
+
+    class _FakeApi:
+        def __init__(self, *_, **kw):
+            captured["ua"] = kw.get("http_client").headers.get("User-Agent")
+
+        def fetch(self, *a, **kw):
+            class _FT:
+                def to_raw_data(self):
+                    return [{"start": 0.0, "duration": 1.0, "text": "hi"}]
+
+            return _FT()
+
+    monkeypatch.setattr(ytb, "YouTubeTranscriptApi", _FakeApi)
+
+    run_cli(tmp_path, "https://youtu.be/vidX")
+
+    assert captured["ua"].startswith("Mozilla"), "User-Agent not set"

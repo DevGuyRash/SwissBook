@@ -378,9 +378,9 @@ async def grab(
                     url = proxy_pool[0] if len(proxy_pool) == 1 else choice(proxy_pool)
                     proxy = GenericProxyConfig(http_url=url, https_url=url)
 
-                session = None
+                session = requests.Session()
+                session.headers.update({"User-Agent": "Mozilla/5.0"})
                 if cookies:
-                    session = requests.Session()
                     for c in cookies:
                         session.cookies.set(c.get("name"), c.get("value"))
 
