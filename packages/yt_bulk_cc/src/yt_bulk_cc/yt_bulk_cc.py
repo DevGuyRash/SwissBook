@@ -848,10 +848,9 @@ async def _main() -> None:
     if args.check_ip:
         from .core import probe_video
         first_vid = videos[0]["videoId"]
-        ok_probe, banned = probe_video(first_vid, cookies=cookies_data, proxy_pool=proxy_pool)
-        banned_proxies.update(banned)
+        ok_probe, banned_proxies = probe_video(first_vid, cookies=cookies_data, proxy_pool=proxy_pool, banned=banned_proxies)
         if not ok_probe:
-            logging.error("IP appears blocked; skipping downloads")
+            logging.error("IP appears blocked; aborting")
             for v in videos:
                 title = slug(v["title"]["runs"][0]["text"])
                 pre_results.append(("fail", v["videoId"], title))
