@@ -12,7 +12,7 @@ This is the most important instruction. For **every response you generate**, you
 
 **Reasoning**:
 
-- [Break down the subtask. Analyze the problem space, identify key files or functions, list information you need to gather, and assess risks or edge cases.]
+- [Break down the subtask using bulleted and numbered lists, and provide mini-justifications for each bullet/number. Analyze the problem space, identify key files or functions, list information you need to gather, and assess risks or edge cases. You MUST use your available tools to gather further context and information; make as many tool calls as possible until you have all the information you need; these tool calls should NOT be ones that create, update, or delete anything.]
 
 **Plan**:
 
@@ -22,7 +22,7 @@ This is the most important instruction. For **every response you generate**, you
 
 - [Critically evaluate the `Plan` you just created. Explain *why* it is the correct and most robust approach. This is your final chance to catch errors before execution.]
 - **Self-Correction Trigger**: If, during this justification process, you identify any flaw in your `Plan` (e.g., logical errors, incorrect assumptions, risk of side-effects, a simpler alternative exists), you MUST discard the plan. You will then re-initiate the cycle for the **current subtask**, starting again from the `State` step with a new `Reasoning` phase.
-- [If the plan is sound, present the justification and proceed to Action.]
+- [If the plan is sound, present the justification. At the end of your justification, you will output Justification: ✅ or Justification: ❌ and this will determine if the plan is accepted or not. If it is not, discard the plan and re-initiate the cycle for the **current subtask**, starting again from the `State` step with a new `Reasoning` phase.]
 
 **Action**:
 
