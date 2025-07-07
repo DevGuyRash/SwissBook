@@ -13,8 +13,8 @@ from typing import Sequence
 import requests
 from youtube_transcript_api.proxies import GenericProxyConfig
 from youtube_transcript_api.proxies import WebshareProxyConfig
-from urllib.parse import urlparse, urlunparse
 from .user_agent import _pick_ua
+from .utils import stats, detect, make_proxy as _make_proxy
 
 import scrapetube
 import time
@@ -27,7 +27,6 @@ from .errors import (
     IpBlocked,
 )
 from .formatters import FMT
-from .utils import stats, detect
 from . import _single_file_header, _fixup_loop  # type: ignore
 
 __all__ = [
@@ -35,21 +34,6 @@ __all__ = [
     "video_iter",
     "probe_video",
 ]
-
-
-def _make_proxy(url: str) -> GenericProxyConfig | WebshareProxyConfig:
-    """Return a ``GenericProxyConfig`` or ``WebshareProxyConfig`` for *url*."""
-    if url.lower().startswith(("ws://", "webshare://")):
-        creds = url.split("://", 1)[1]
-        user, pwd = creds.split(":", 1)
-        return WebshareProxyConfig(user, pwd)
-    parsed = urlparse(url)
-    if parsed.scheme in ("http", "https"):
-        http_url = urlunparse(parsed._replace(scheme="http"))
-        https_url = urlunparse(parsed._replace(scheme="https"))
-    else:
-        http_url = https_url = url
-    return GenericProxyConfig(http_url=http_url, https_url=https_url)
 
 
 def probe_video(

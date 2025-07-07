@@ -12,6 +12,8 @@ import os
 import re
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.parse import urlparse, urlunparse
+from youtube_transcript_api.proxies import GenericProxyConfig, WebshareProxyConfig
 
 __all__ = [
     "BAD_REGEX",
@@ -20,6 +22,7 @@ __all__ = [
     "shorten_path",
     "detect",
     "coerce_attr",
+    "make_proxy",
 ]
 
 # ---------------------------------------------------------------------------
@@ -113,4 +116,19 @@ def detect(url: str) -> tuple[str, str]:
         return "playlist", m.group(1)
     if _CHAN_RE.search(url) or url.rstrip("/").endswith("/videos"):
         return "channel", url
-    raise argparse.ArgumentTypeError("Link doesn't look like video/playlist/channel") 
+    raise argparse.ArgumentTypeError("Link doesn't look like video/playlist/channel")
+
+
+def make_proxy(url: str) -> GenericProxyConfig | WebshareProxyConfig:
+    """Return a ``GenericProxyConfig`` or ``WebshareProxyConfig`` for *url*."""
+    if url.lower().startswith(("ws://", "webshare://")):
+        creds = url.split("://", 1)[1]
+        user, pwd = creds.split(":", 1)
+        return WebshareProxyConfig(user, pwd)
+    parsed = urlparse(url)
+    if parsed.scheme in ("http", "https"):
+        http_url = urlunparse(parsed._replace(scheme="http"))
+        https_url = urlunparse(parsed._replace(scheme="https"))
+    else:
+        http_url = https_url = url
+    return GenericProxyConfig(http_url=http_url, https_url=https_url)
