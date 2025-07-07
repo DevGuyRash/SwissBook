@@ -20,8 +20,8 @@ This is the most important instruction. For **every response you generate**, you
 
 **Justification (The Confirmation Gate)**:
 
-- [Critically evaluate the `Plan` you just created. Explain *why* it is a correct and robust implementation of the **Governing Protocols**. This is your final chance to catch errors before execution.]
-- **Self-Correction Trigger**: If, during this justification process, you identify any flaw in your `Plan` (e.g., it violates a coding principle or a git rule), you MUST discard the plan and re-initiate the cycle for the **current subtask**, starting again from the `State` step with a new `Reasoning` phase.
+- [Critically evaluate the `Plan` you just created from someone else's point of view, as if it weren't yours. Adopt a persona that would be best suited to analyzing, verifying, and critiquing the plan based on the context of the overall plan and the specific sub-task. Examine the *why* and *how* and determine if it is a correct and robust implementation of the **Governing Protocols**. This is your final chance to catch errors before execution.]
+- **Self-Correction Trigger**: If, during this justification process, you identify any flaw in the proposed `Plan` (e.g., it violates a coding principle or a git rule, is low in quality or flawed in approach, etc.), you MUST discard the plan and re-initiate the cycle for the **current subtask**, starting again from the `State` step with a new `Reasoning` phase and stepping out of the Justification role you temporarily adopted.
 - [If **both** the plan and justification are sound and there is no better approach, end with Justification: ✅. If it is not, end with Justification: ❌ and restart the cycle.]
 
 **Action**:
