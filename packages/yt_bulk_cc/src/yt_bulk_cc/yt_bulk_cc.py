@@ -31,6 +31,7 @@ import contextlib
 import datetime
 import os            # NEW - Windows pathname tweak
 import json
+import glob
 import logging
 import re
 import signal
@@ -921,7 +922,8 @@ async def _main() -> None:
 
                 # ── locate the file regardless of an optional 00001-style prefix
                 try:
-                    src = next(out_dir.glob(f"*[{vid}]*.json"))
+                    pattern = f"*{glob.escape('[' + vid + ']')}*.json"
+                    src = next(out_dir.glob(pattern))
                 except StopIteration:
                     logging.warning("File for %s not found - prefix off?", vid)
                     continue
@@ -993,7 +995,8 @@ async def _main() -> None:
                 else:
                     continue
                 try:
-                    src = next(out_dir.glob(f"*[{vid}]*.{EXT[args.format]}"))
+                    pattern = f"*{glob.escape('[' + vid + ']')}*.{EXT[args.format]}"
+                    src = next(out_dir.glob(pattern))
                 except StopIteration:
                     logging.warning("File for %s not found - prefix off?", vid)
                     continue

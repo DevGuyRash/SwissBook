@@ -165,6 +165,28 @@ def test_concat_with_split(tmp_path: Path, unit):
 
 
 @pytest.mark.usefixtures("patch_transcript", "patch_scrapetube", "patch_detect")
+def test_text_concat_unique_videos(tmp_path: Path):
+    """Concatenated text output should contain each video once in order."""
+    run_cli(
+        tmp_path,
+        "dummy",
+        "-f",
+        "text",
+        "-C",
+        "bundle",
+        "-n",
+        "3",
+    )
+    out = tmp_path / "bundle.txt"
+    data = out.read_text()
+    ids = [f"vid{i}" for i in range(3)]
+    for vid in ids:
+        assert data.count(vid) >= 1, f"{vid} missing in concat"
+    seps = [l for l in data.splitlines() if l.startswith("──── ")]
+    assert len(seps) == 3
+
+
+@pytest.mark.usefixtures("patch_transcript", "patch_scrapetube", "patch_detect")
 def test_json_concat_contains_meta_and_stats(tmp_path: Path):
     run_cli(
         tmp_path,
@@ -182,6 +204,24 @@ def test_json_concat_contains_meta_and_stats(tmp_path: Path):
     assert {"stats", "items"} <= data.keys()
     assert data["stats"]["words"] > 0
     assert len(data["items"]) == 3
+
+
+@pytest.mark.usefixtures("patch_transcript", "patch_scrapetube", "patch_detect")
+def test_json_concat_unique_videos(tmp_path: Path):
+    """Ensure concatenated JSON lists each video exactly once."""
+    run_cli(
+        tmp_path,
+        "dummy",
+        "-f",
+        "json",
+        "-C",
+        "combo",
+        "-n",
+        "3",
+    )
+    out = tmp_path / "combo.json"
+    vids = [item["video_id"] for item in json.loads(out.read_text())["items"]]
+    assert vids == [f"vid{i}" for i in range(3)]
 
 
 # ────────────────────────── converter  ─────────────────────────────────── #
