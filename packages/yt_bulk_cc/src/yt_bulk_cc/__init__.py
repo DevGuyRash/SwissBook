@@ -57,6 +57,7 @@ from .errors import (
     TooManyRequests,
 )  # noqa: E402
 from .core import grab, video_iter  # noqa: E402
+from .user_agent import _pick_ua  # noqa: E402
 
 globals().update({
     "slug": slug,
@@ -75,12 +76,14 @@ globals().update({
     "TooManyRequests": TooManyRequests,
     "grab": grab,
     "video_iter": video_iter,
+    "_pick_ua": _pick_ua,
 })
 
 # Keep __all__ accurate
 __all__ = sorted(set(__all__) | {
     "slug", "_stats", "detect", "_shorten_for_windows", "TimeStampedText", "FMT", "EXT", "convert_existing", "CouldNotRetrieveTranscript", "NoTranscriptFound", "TranscriptsDisabled", "VideoUnavailable", "NoTranscriptAvailable", "TooManyRequests", "grab", "video_iter"
-}) 
+    , "_pick_ua",
+})
 
 # ---------------------------------------------------------------------------
 # Make asyncio.run tolerant when already inside a running event loop.

@@ -13,6 +13,7 @@ from random import choice
 from typing import Sequence
 import requests
 from youtube_transcript_api.proxies import GenericProxyConfig
+from .user_agent import _pick_ua
 
 import scrapetube
 from youtube_transcript_api import YouTubeTranscriptApi
@@ -58,7 +59,7 @@ async def grab(
                     proxy = GenericProxyConfig(http_url=url, https_url=url)
 
                 session = requests.Session()
-                session.headers.update({"User-Agent": "Mozilla/5.0"})
+                session.headers.update({"User-Agent": _pick_ua()})
                 if cookies:
                     for c in cookies:
                         session.cookies.set(c.get("name"), c.get("value"))

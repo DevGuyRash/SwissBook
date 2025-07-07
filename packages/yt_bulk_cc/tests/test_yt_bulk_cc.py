@@ -820,6 +820,7 @@ def test_default_user_agent(monkeypatch, tmp_path: Path):
     """grab() should use a sensible User-Agent header by default."""
 
     monkeypatch.setattr(ytb, "detect", lambda _u: ("video", "vidX"))
+    monkeypatch.setattr(ytb, "_pick_ua", lambda *_a, **_k: "UA/123")
 
     captured = {}
 
@@ -838,4 +839,4 @@ def test_default_user_agent(monkeypatch, tmp_path: Path):
 
     run_cli(tmp_path, "https://youtu.be/vidX")
 
-    assert captured["ua"].startswith("Mozilla"), "User-Agent not set"
+    assert captured["ua"] == "UA/123"
