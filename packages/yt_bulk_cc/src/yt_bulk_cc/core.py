@@ -46,6 +46,7 @@ async def grab(
     cookies: list | None = None,
     proxy_pool: list[str] | None = None,
     include_stats: bool = True,
+    delay: float = 0.0,
 ):
     """Download a single transcript asynchronously and write it to *path*."""
     async with sem:
@@ -104,20 +105,30 @@ async def grab(
                     full = _single_file_header(fmt_key, data, meta)  # type: ignore[arg-type]
                     path.write_text(full, encoding="utf-8")
                 logging.info("✔ saved %s", path.name)
+                if delay:
+                    await asyncio.sleep(delay)
                 return ("ok", vid, title)
 
             except (TranscriptsDisabled, NoTranscriptFound):
                 logging.warning("No subtitles for video %s", vid)
+                if delay:
+                    await asyncio.sleep(delay)
                 return ("none", vid, title)
             except (TooManyRequests, IpBlocked, CouldNotRetrieveTranscript) as exc:
                 wait = 6 * attempt
                 logging.info("⏳ %s - retrying in %ss (attempt %s/%s)",
-                             exc.__class__.__name__, wait, attempt, tries)
+                    exc.__class__.__name__,
+                    wait,
+                    attempt,
+                    tries,
+                )
                 await asyncio.sleep(wait)
                 continue
             except Exception as exc:
                 if attempt == tries:
                     logging.error("%s after %d tries – giving up", exc, attempt)
+                    if delay:
+                        await asyncio.sleep(delay)
                     return ("fail", vid, title)
                 await asyncio.sleep(0.5 * attempt)
 

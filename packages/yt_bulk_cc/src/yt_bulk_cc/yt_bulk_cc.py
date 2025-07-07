@@ -368,6 +368,7 @@ async def grab(
     cookies: list | None = None,
     proxy_pool: list[str] | None = None,
     include_stats: bool = True,
+    delay: float = 0.0,
 ) -> tuple[str, str, str]:   # (status, video_id, title)
     async with sem:
         for attempt in range(1, tries + 1):
@@ -431,10 +432,14 @@ async def grab(
                     full = _single_file_header(fmt_key, data, meta)
                     path.write_text(full, encoding="utf-8")
                 logging.info("✔ saved %s", path.name)
+                if delay:
+                    await asyncio.sleep(delay)
                 return ("ok", vid, title)
 
             except (TranscriptsDisabled, NoTranscriptFound):
                 logging.warning("✖ no transcript for %s", vid)
+                if delay:
+                    await asyncio.sleep(delay)
                 return ("none", vid, title)
 
             # ← NEW: some library versions throw a TypeError instead when the
@@ -451,10 +456,24 @@ async def grab(
                 return ("fail", vid, title)
             except (TooManyRequests, IpBlocked, CouldNotRetrieveTranscript) as exc:
                 wait = 6 * attempt
-                logging.info("⏳ %s - retrying in %ss (attempt %s/%s)",
-                             exc.__class__.__name__, wait, attempt, tries)
+                logging.info(
+                    "⏳ %s - retrying in %ss (attempt %s/%s)",
+                    exc.__class__.__name__,
+                    wait,
+                    attempt,
+                    tries,
+                )
                 await asyncio.sleep(wait)
                 continue
+            except Exception as exc:
+                if attempt == tries:
+                    logging.error("%s after %d tries – giving up", exc, attempt)
+                    if delay:
+                        await asyncio.sleep(delay)
+                    return ("fail", vid, title)
+                await asyncio.sleep(0.5 * attempt)
+        if delay:
+            await asyncio.sleep(delay)
         return ("fail", vid, title)
 
 
@@ -553,6 +572,8 @@ async def _main() -> None:
                    help="Concurrent transcript downloads")
     P.add_argument("-s", "--sleep", type=int, default=3,
                    help="Seconds between scrapetube pagination calls")
+    P.add_argument("--delay", type=float, default=0.0,
+                   help="Seconds to wait after each transcript download")
     P.add_argument("-v", "--verbose", action="count", default=0,
                    help="-v=info, -vv=debug")
     P.add_argument("--no-seq-prefix", action="store_true",
@@ -802,12 +823,18 @@ async def _main() -> None:
             skipped.append(("old", vid, title))
             continue
         tasks.append(
-            grab(vid, title, fpath,
-                 args.language or [],
-                 args.format, sem,
-                 proxy_pool=proxy_pool,
-                 cookies=cookies_data,
-                 include_stats=args.stats and not args.concat)
+            grab(
+                vid,
+                title,
+                fpath,
+                args.language or [],
+                args.format,
+                sem,
+                proxy_pool=proxy_pool,
+                cookies=cookies_data,
+                include_stats=args.stats and not args.concat,
+                delay=args.delay,
+            )
         )
 
     if not tasks and not skipped:

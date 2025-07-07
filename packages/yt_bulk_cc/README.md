@@ -93,6 +93,7 @@ python -m yt_bulk_cc.yt_bulk_cc --convert ./out -f srt -o ./out_srt
 | `-p`, `--proxy`              | _(url)_         | A single proxy URL or a comma-separated list to rotate through.                                                                  |
 | `-c`, `--cookie-json`        | _(file)_        | Path to a cookies JSON file for accessing private/members-only content.                                                          |
 | `-s`, `--sleep`              | _(int)_         | Seconds to wait between pagination requests when scraping. Default: `2`.                                                         |
+| `--delay`                    | _(float)_       | Seconds to wait after each transcript download. |
 | **Utilities**                |                 |                                                                                                                                  |
 | `--convert`                  | _(path)_        | Converts existing JSON transcripts from a file or directory to the specified `-f` format.                                        |
 | `--overwrite`                |                 | Re-download and overwrite files even if they already exist.                                                                      |
