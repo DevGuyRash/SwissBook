@@ -30,7 +30,6 @@ import asyncio
 import contextlib
 import datetime
 import os            # NEW - Windows pathname tweak
-import inspect
 import json
 import logging
 import re
@@ -46,6 +45,9 @@ from typing import Sequence
 
 import scrapetube
 from youtube_transcript_api import YouTubeTranscriptApi, formatters
+from youtube_transcript_api.proxies import GenericProxyConfig
+import requests
+from .user_agent import _pick_ua
 # ------------------------------------------------------------
 #  Robust error-class import — works on every library version
 # ------------------------------------------------------------
@@ -366,33 +368,47 @@ async def grab(
     *,
     cookies: list | None = None,
     proxy_pool: list[str] | None = None,
+    banned: set[str] | None = None,
     include_stats: bool = True,
+    delay: float = 0.0,
 ) -> tuple[str, str, str]:   # (status, video_id, title)
     async with sem:
+        proxy_cycle = None
+        if proxy_pool:
+            from itertools import cycle
+
+            proxy_cycle = cycle(proxy_pool)
+        banned = banned if banned is not None else set()
+
         for attempt in range(1, tries + 1):
             try:
-                # build kwargs only with supported keys
-                sig_params = inspect.signature(
-                    YouTubeTranscriptApi.get_transcript
-                ).parameters
-                kwargs = {}
-                if langs and "languages" in sig_params:
-                    kwargs["languages"] = list(langs)
-                if proxy_pool and "proxies" in sig_params:
-                    url = proxy_pool[0] if len(proxy_pool) == 1 else choice(proxy_pool)
-                    kwargs["proxies"] = {"http": url, "https": url}
-                if cookies and "cookies" in sig_params:
-                    kwargs["cookies"] = cookies
+                proxy = None
+                url = None
+                if proxy_cycle:
+                    for _ in range(len(proxy_pool)):
+                        cand = next(proxy_cycle)
+                        if cand not in banned:
+                            url = cand
+                            break
+                    else:
+                        logging.error("All proxies appear blocked; abort %s", vid)
+                        return ("fail", vid, title)
+                    proxy = GenericProxyConfig(http_url=url, https_url=url)
 
-                
+                session = requests.Session()
+                session.headers.update({"User-Agent": _pick_ua()})
+                if cookies:
+                    for c in cookies:
+                        session.cookies.set(c.get("name"), c.get("value"))
 
+                api = YouTubeTranscriptApi(proxy_config=proxy, http_client=session)
 
-                # returns a list of dicts
                 tr = await asyncio.to_thread(
-                    YouTubeTranscriptApi.get_transcript,
+                    api.fetch,
                     vid,
-                    **kwargs,
+                    languages=list(langs) if langs else ["en"],
                 )
+                tr = tr.to_raw_data()
 
                 meta = {
                     "video_id": vid,
@@ -433,10 +449,14 @@ async def grab(
                     full = _single_file_header(fmt_key, data, meta)
                     path.write_text(full, encoding="utf-8")
                 logging.info("✔ saved %s", path.name)
+                if delay:
+                    await asyncio.sleep(delay)
                 return ("ok", vid, title)
 
             except (TranscriptsDisabled, NoTranscriptFound):
                 logging.warning("✖ no transcript for %s", vid)
+                if delay:
+                    await asyncio.sleep(delay)
                 return ("none", vid, title)
 
             # ← NEW: some library versions throw a TypeError instead when the
@@ -452,11 +472,29 @@ async def grab(
                 logging.warning("✖ video unavailable %s", vid)
                 return ("fail", vid, title)
             except (TooManyRequests, IpBlocked, CouldNotRetrieveTranscript) as exc:
+                if url:
+                    banned.add(url)
                 wait = 6 * attempt
-                logging.info("⏳ %s - retrying in %ss (attempt %s/%s)",
-                             exc.__class__.__name__, wait, attempt, tries)
+                logging.info(
+                    "⏳ %s - retrying in %ss (attempt %s/%s)",
+                    exc.__class__.__name__,
+                    wait,
+                    attempt,
+                    tries,
+                )
                 await asyncio.sleep(wait)
                 continue
+            except Exception as exc:
+                if attempt == tries:
+                    logging.error("%s after %d tries – giving up", exc, attempt)
+                    if url:
+                        banned.add(url)
+                    if delay:
+                        await asyncio.sleep(delay)
+                    return ("fail", vid, title)
+                await asyncio.sleep(0.5 * attempt)
+        if delay:
+            await asyncio.sleep(delay)
         return ("fail", vid, title)
 
 
@@ -501,12 +539,13 @@ class ColorFormatter(logging.Formatter):
             rec.msg = f"{color}{rec.getMessage()}{C.END}"
             rec.args = ()
 
-        if rec.msg.startswith("Summary:") and len(rec.args) == 4:
-            ok, none, fail, total = rec.args
+        if rec.msg.startswith("Summary:") and len(rec.args) == 5:
+            ok, none, fail, banned, total = rec.args
             rec.msg = (
                 f"Summary: ✓ {C.GRN}{ok}{C.END}   •  "
                 f"↯ no-caption {C.YEL}{none}{C.END}   •  "
                 f"⚠ failed {C.RED}{fail}{C.END}   "
+                f"🚫 banned {C.RED}{banned}{C.END}   "
                 f"(total {total})"
             )
             rec.args = ()
@@ -553,8 +592,8 @@ async def _main() -> None:
                    help="Stop after N videos (handy for testing)")
     P.add_argument("-j", "--jobs", type=int, default=1,
                    help="Concurrent transcript downloads")
-    P.add_argument("-s", "--sleep", type=int, default=3,
-                   help="Seconds between scrapetube pagination calls")
+    P.add_argument("-s", "--sleep", type=float, default=2.0,
+                   help="Seconds to wait between requests and after each download")
     P.add_argument("-v", "--verbose", action="count", default=0,
                    help="-v=info, -vv=debug")
     P.add_argument("--no-seq-prefix", action="store_true",
@@ -582,8 +621,13 @@ async def _main() -> None:
                    help="Show examples of each output format and exit")
     P.add_argument("-p", "--proxy", metavar="URL[,URL2,…]",
                    help="Single proxy or comma-list to rotate between")
-    P.add_argument("-c", "--cookie-json", metavar="FILE",
+    P.add_argument("--proxy-file", metavar="FILE",
+                   help="File containing one proxy URL per line")
+    P.add_argument("-c", "--cookie-json", "--cookie-file", dest="cookie_json",
+                   metavar="FILE",
                    help="Cookies JSON exported by browser (see docs)")
+    P.add_argument("--check-ip", action="store_true",
+                   help="Fetch first video once to detect IP blocks early")
     P.add_argument("--overwrite", action="store_true",
                    help="Re-download even if output file already exists")
 
@@ -776,8 +820,18 @@ async def _main() -> None:
     logging.info("Found %s videos", len(videos))
 
     proxy_pool: list[str] | None = None
+    proxies: list[str] = []
     if args.proxy:
-        proxy_pool = [p.strip() for p in args.proxy.split(",") if p.strip()]
+        proxies.extend(p.strip() for p in args.proxy.split(",") if p.strip())
+    if args.proxy_file:
+        try:
+            with open(args.proxy_file, "r", encoding="utf-8") as fh:
+                proxies.extend(p.strip() for p in fh if p.strip())
+        except Exception as e:
+            logging.error("Cannot read proxy file %s (%s)", args.proxy_file, e)
+            sys.exit(1)
+    if proxies:
+        proxy_pool = proxies
 
     cookies_data: list | None = None
     if args.cookie_json:
@@ -788,31 +842,53 @@ async def _main() -> None:
             logging.error("Cannot read cookies file %s (%s)", args.cookie_json, e)
             sys.exit(1)
 
+    pre_results: list[tuple[str, str, str]] = []
+    banned_proxies: set[str] = set()
+
+    if args.check_ip:
+        from .core import probe_video
+        first_vid = videos[0]["videoId"]
+        ok_probe, banned = probe_video(first_vid, cookies=cookies_data, proxy_pool=proxy_pool)
+        banned_proxies.update(banned)
+        if not ok_probe:
+            logging.error("IP appears blocked; skipping downloads")
+            for v in videos:
+                title = slug(v["title"]["runs"][0]["text"])
+                pre_results.append(("fail", v["videoId"], title))
+
     sem     = asyncio.Semaphore(args.jobs)
     tasks   = []
     skipped = []
 
     digits = len(str(len(videos)))       # width for zero-padding
 
-    for idx, v in enumerate(videos, 1):
-        vid   = v["videoId"]
-        title = slug(v["title"]["runs"][0]["text"])
-        prefix = "" if args.no_seq_prefix else f"{idx:0{digits}d} "
-        fpath  = out_dir / f"{prefix}[{vid}] {title}.{EXT[args.format]}"
-        fpath  = _shorten_for_windows(fpath)        # NEW
-        if fpath.exists() and not args.overwrite:
-            skipped.append(("old", vid, title))
-            continue
-        tasks.append(
-            grab(vid, title, fpath,
-                 args.language or [],
-                 args.format, sem,
-                 proxy_pool=proxy_pool,
-                 cookies=cookies_data,
-                 include_stats=args.stats and not args.concat)
-        )
+    if not pre_results:
+        for idx, v in enumerate(videos, 1):
+            vid   = v["videoId"]
+            title = slug(v["title"]["runs"][0]["text"])
+            prefix = "" if args.no_seq_prefix else f"{idx:0{digits}d} "
+            fpath  = out_dir / f"{prefix}[{vid}] {title}.{EXT[args.format]}"
+            fpath  = _shorten_for_windows(fpath)        # NEW
+            if fpath.exists() and not args.overwrite:
+                skipped.append(("old", vid, title))
+                continue
+            tasks.append(
+                grab(
+                    vid,
+                    title,
+                    fpath,
+                    args.language or [],
+                    args.format,
+                    sem,
+                    proxy_pool=proxy_pool,
+                    cookies=cookies_data,
+                    include_stats=args.stats and not args.concat,
+                    delay=args.sleep,
+                    banned=banned_proxies,
+                )
+            )
 
-    if not tasks and not skipped:
+    if not tasks and not skipped and not pre_results:
         logging.info("Nothing to do (all files already present).")
         return
 
@@ -856,6 +932,8 @@ async def _main() -> None:
     except ModuleNotFoundError:
         results = await asyncio.gather(*tasks)
 
+    results = pre_results + results
+
     ok   = [r for r in results if r[0] == "ok"] + skipped
     none = [r for r in results if r[0] == "none"]
     fail = [r for r in results if r[0] == "fail"]
@@ -892,14 +970,15 @@ async def _main() -> None:
         sys.stdout.flush()
         # Emit the roll-up *after* the lists.
         logging.info(
-            "Summary: ✓ %s   •  ↯ no-caption %s   •  ⚠ failed %s   (total %s)",
-            len(ok), len(none), len(fail), len(ok) + len(none) + len(fail),
+            "Summary: ✓ %s   •  ↯ no-caption %s   •  ⚠ failed %s   •  🚫 banned %s   (total %s)",
+            len(ok), len(none), len(fail), len(banned_proxies), len(ok) + len(none) + len(fail),
         )
         # plain echo guarantees the final line is literally "Summary: …"
         print(
             f"Summary: ✓ {C.GRN}{len(ok)}{C.END}   •  "
             f"↯ no-caption {C.YEL}{len(none)}{C.END}   •  "
             f"⚠ failed {C.RED}{len(fail)}{C.END}   "
+            f"🚫 banned {C.RED}{len(banned_proxies)}{C.END}   "
             f"(total {len(ok)+len(none)+len(fail)})"
         )
         sys.stdout.flush()

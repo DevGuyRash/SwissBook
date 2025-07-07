@@ -91,8 +91,10 @@ python -m yt_bulk_cc.yt_bulk_cc --convert ./out -f srt -o ./out_srt
 | `--split`                    | _(e.g. 10000c)_ | With `--concat`, splits the output into new files when a size threshold is met.<br>Units: `w` (words), `l` (lines), `c` (chars). |
 | **Network & Authentication** |                 |                                                                                                                                  |
 | `-p`, `--proxy`              | _(url)_         | A single proxy URL or a comma-separated list to rotate through.                                                                  |
-| `-c`, `--cookie-json`        | _(file)_        | Path to a cookies JSON file for accessing private/members-only content.                                                          |
-| `-s`, `--sleep`              | _(int)_         | Seconds to wait between pagination requests when scraping. Default: `2`.                                                         |
+| `--proxy-file`              | _(file)_        | Load proxies from a file (one URL per line). |
+| `-c`, `--cookie-json`, `--cookie-file`        | _(file)_        | Cookies JSON exported with a browser extension (see below). |
+| `-s`, `--sleep`              | _(float)_       | Seconds to wait between playlist requests and after each transcript. Default: `2`. |
+| `--check-ip`                |                 | Preflight transcript fetch to detect IP bans before downloading. |
 | **Utilities**                |                 |                                                                                                                                  |
 | `--convert`                  | _(path)_        | Converts existing JSON transcripts from a file or directory to the specified `-f` format.                                        |
 | `--overwrite`                |                 | Re-download and overwrite files even if they already exist.                                                                      |
@@ -101,6 +103,12 @@ python -m yt_bulk_cc.yt_bulk_cc --convert ./out -f srt -o ./out_srt
 | `--no-log`                   |                 | Disable file logging entirely.                                                                                                   |
 | `-F`, `--formats-help`       |                 | Show examples of each output format and exit.                                                                                    |
 
+### Exporting cookies
+
+Use a browser extension like **Get cookies.txt** for Chrome or Firefox:
+1. Log into YouTube in your browser.
+2. Choose **Export as JSON** for `youtube.com` in the extension menu.
+3. Save the file (e.g. `cookies.json`) and pass it with `-c cookies.json`.
 ---
 
 ## License

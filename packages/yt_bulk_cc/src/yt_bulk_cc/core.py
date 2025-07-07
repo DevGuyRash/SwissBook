@@ -7,11 +7,12 @@ other modules to keep responsibilities clear.
 from __future__ import annotations
 
 import asyncio
-import inspect
 import logging
 from pathlib import Path
-from random import choice
 from typing import Sequence
+import requests
+from youtube_transcript_api.proxies import GenericProxyConfig
+from .user_agent import _pick_ua
 
 import scrapetube
 from youtube_transcript_api import YouTubeTranscriptApi
@@ -30,7 +31,38 @@ from . import _single_file_header, _fixup_loop  # type: ignore
 __all__ = [
     "grab",
     "video_iter",
+    "probe_video",
 ]
+
+
+def probe_video(
+    vid: str,
+    *,
+    cookies: list | None = None,
+    proxy_pool: list[str] | None = None,
+    banned: set[str] | None = None,
+) -> tuple[bool, set[str]]:
+    """Return ``(ok, banned_proxies)`` after probing ``vid``."""
+    banned = banned if banned is not None else set()
+    proxies = proxy_pool or [None]
+    for url in proxies:
+        proxy = GenericProxyConfig(http_url=url, https_url=url) if url else None
+        session = requests.Session()
+        session.headers.update({"User-Agent": _pick_ua()})
+        if cookies:
+            for c in cookies:
+                session.cookies.set(c.get("name"), c.get("value"))
+        api = YouTubeTranscriptApi(proxy_config=proxy, http_client=session)
+        try:
+            api.fetch(vid, languages=["en"]).to_raw_data()
+            return True, banned
+        except (TooManyRequests, IpBlocked):
+            if url:
+                banned.add(url)
+            continue
+        except Exception:
+            return True, banned
+    return False, banned
 
 
 async def grab(
@@ -44,29 +76,48 @@ async def grab(
     *,
     cookies: list | None = None,
     proxy_pool: list[str] | None = None,
+    banned: set[str] | None = None,
     include_stats: bool = True,
+    delay: float = 0.0,
 ):
     """Download a single transcript asynchronously and write it to *path*."""
     async with sem:
+        proxy_cycle = None
+        if proxy_pool:
+            from itertools import cycle
+
+            proxy_cycle = cycle(proxy_pool)
+        banned = banned if banned is not None else set()
+
         for attempt in range(1, tries + 1):
             try:
-                sig_params = inspect.signature(
-                    YouTubeTranscriptApi.get_transcript
-                ).parameters
-                kwargs: dict = {}
-                if langs and "languages" in sig_params:
-                    kwargs["languages"] = list(langs)
-                if proxy_pool and "proxies" in sig_params:
-                    url = proxy_pool[0] if len(proxy_pool) == 1 else choice(proxy_pool)
-                    kwargs["proxies"] = {"http": url, "https": url}
-                if cookies and "cookies" in sig_params:
-                    kwargs["cookies"] = cookies
+                proxy = None
+                url = None
+                if proxy_cycle:
+                    for _ in range(len(proxy_pool)):
+                        cand = next(proxy_cycle)
+                        if cand not in banned:
+                            url = cand
+                            break
+                    else:
+                        logging.error("All proxies appear blocked; abort %s", vid)
+                        return ("fail", vid, title)
+                    proxy = GenericProxyConfig(http_url=url, https_url=url)
+
+                session = requests.Session()
+                session.headers.update({"User-Agent": _pick_ua()})
+                if cookies:
+                    for c in cookies:
+                        session.cookies.set(c.get("name"), c.get("value"))
+
+                api = YouTubeTranscriptApi(proxy_config=proxy, http_client=session)
 
                 tr = await asyncio.to_thread(
-                    YouTubeTranscriptApi.get_transcript,
+                    api.fetch,
                     vid,
-                    **kwargs,
+                    languages=list(langs) if langs else ["en"],
                 )
+                tr = tr.to_raw_data()
 
                 meta = {
                     "video_id": vid,
@@ -101,20 +152,35 @@ async def grab(
                     full = _single_file_header(fmt_key, data, meta)  # type: ignore[arg-type]
                     path.write_text(full, encoding="utf-8")
                 logging.info("✔ saved %s", path.name)
+                if delay:
+                    await asyncio.sleep(delay)
                 return ("ok", vid, title)
 
             except (TranscriptsDisabled, NoTranscriptFound):
                 logging.warning("No subtitles for video %s", vid)
+                if delay:
+                    await asyncio.sleep(delay)
                 return ("none", vid, title)
             except (TooManyRequests, IpBlocked, CouldNotRetrieveTranscript) as exc:
+                if url:
+                    banned.add(url)
                 wait = 6 * attempt
-                logging.info("⏳ %s - retrying in %ss (attempt %s/%s)",
-                             exc.__class__.__name__, wait, attempt, tries)
+                logging.info(
+                    "⏳ %s - retrying in %ss (attempt %s/%s)",
+                    exc.__class__.__name__,
+                    wait,
+                    attempt,
+                    tries,
+                )
                 await asyncio.sleep(wait)
                 continue
             except Exception as exc:
                 if attempt == tries:
                     logging.error("%s after %d tries – giving up", exc, attempt)
+                    if url:
+                        banned.add(url)
+                    if delay:
+                        await asyncio.sleep(delay)
                     return ("fail", vid, title)
                 await asyncio.sleep(0.5 * attempt)
 
@@ -131,9 +197,9 @@ def video_iter(kind: str, ident: str, limit: int | None, pause: int):
         return
 
     if kind == "playlist":
-        vid_dicts = scrapetube.get_playlist(ident, limit=limit or 0)
+        vid_dicts = scrapetube.get_playlist(ident, limit=limit or 0, sleep=pause)
     else:  # channel
-        vid_dicts = scrapetube.get_channel(ident, limit=limit or 0)
+        vid_dicts = scrapetube.get_channel(channel_url=ident, limit=limit or 0, sleep=pause)
 
     for d in vid_dicts:
         vid = d["videoId"]
