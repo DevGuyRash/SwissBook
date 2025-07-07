@@ -1021,3 +1021,64 @@ def test_make_proxy_ws():
         assert isinstance(cfg, ytb.WebshareProxyConfig)
         assert cfg.proxy_username == "aa"
         assert cfg.proxy_password == "bb"
+
+@pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
+def test_proxy_file_rotation(monkeypatch, tmp_path: Path, capsys):
+    proxy_file = tmp_path / "proxies.txt"
+    proxy_file.write_text("http://f1\nhttp://f2\n", encoding="utf-8")
+
+    used = []
+    calls = {"n": 0}
+
+    class _FakeApi:
+        def __init__(self, *a, **kw):
+            cfg = kw.get("proxy_config")
+            used.append(getattr(cfg, "http_url", None))
+
+        def fetch(self, *a, **kw):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise ytb.IpBlocked("blocked")
+
+            class _FT:
+                def to_raw_data(self):
+                    return [{"start": 0.0, "duration": 1.0, "text": "ok"}]
+
+            return _FT()
+
+    monkeypatch.setattr(ytb, "YouTubeTranscriptApi", _FakeApi)
+
+    captured = {}
+    orig_grab = ytb.grab
+
+    async def _wrap(*args, **kw):
+        captured["pool"] = kw.get("proxy_pool")
+        return await orig_grab(*args, **kw)
+
+    monkeypatch.setattr(ytb, "grab", _wrap)
+
+    async def _no_sleep(*a, **k):
+        return None
+
+    monkeypatch.setattr(ytb.asyncio, "sleep", _no_sleep)
+
+    run_cli(
+        tmp_path,
+        "dummy",
+        "-p",
+        "http://cli",
+        "--proxy-file",
+        str(proxy_file),
+        "-f",
+        "text",
+        "-n",
+        "1",
+        "-v",
+        "-s",
+        "0",
+    )
+
+    assert captured["pool"] == ["http://cli", "http://f1", "http://f2"]
+    assert used[:2] == ["http://cli", "http://f1"]
+    out = _strip_ansi(capsys.readouterr().out)
+    assert "banned 1" in out
