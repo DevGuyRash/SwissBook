@@ -356,3 +356,4 @@ pip-selfcheck.json
 **/packages/yt_bulk_cc/**/*.json
 *.txt
 *coverage*
+context/
