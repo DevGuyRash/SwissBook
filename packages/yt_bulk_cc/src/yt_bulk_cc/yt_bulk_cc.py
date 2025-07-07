@@ -43,14 +43,22 @@ import copy          # NEW
 from typing import Sequence
 
 import scrapetube
-from youtube_transcript_api import YouTubeTranscriptApi, formatters
+from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api.proxies import GenericProxyConfig, WebshareProxyConfig
-from urllib.parse import urlparse, urlunparse
 import requests
 from rich.console import Console
 from rich.logging import RichHandler
 from .user_agent import _pick_ua
-from .utils import coerce_attr
+from .utils import (
+    coerce_attr,
+    shorten_path as _shorten_for_windows,
+    slug,
+    stats as _stats,
+    detect,
+    make_proxy as _make_proxy,
+)
+from .formatters import TimeStampedText, FMT, EXT
+from .converter import convert_existing
 # ------------------------------------------------------------
 #  Robust error-class import — works on every library version
 # ------------------------------------------------------------
@@ -66,135 +74,6 @@ from .errors import (
 
 
 # ───────────────────────── helpers ────────────────────────── #
-
-_BAD = re.compile(r'[\\/:*?"<>|\r\n]+')
-
-def _shorten_for_windows(p: Path) -> Path:
-    """
-    Return a path guaranteed to be ≤ 260 characters on Windows
-    (noop on other OSes).  Strategy:
-      1.  If already short: return as-is.
-      2.  Try truncating the slug (title) portion to 40 chars.
-      3.  Fallback: md5 hash + original suffix (extremely unlikely).
-    """
-    if os.name != "nt":
-        return p
-
-    MAX = 250  # a bit under the hard limit
-    if len(str(p)) <= MAX:
-        return p
-
-    dir_part = p.parent
-    base = p.name
-    m = re.match(r"(\d+ )?\[([A-Za-z0-9_-]{11})\] (.+)\.(\w+)", base)
-    if m:
-        prefix, vid, title, ext = m.groups()
-        prefix = prefix or ""
-        new_title = title[:40] + ("…" if len(title) > 40 else "")
-        candidate = dir_part / f"{prefix}[{vid}] {new_title}.{ext}"
-        if len(str(candidate)) <= 260:
-            return candidate
-
-    import hashlib
-
-    short = hashlib.md5(base.encode()).hexdigest()[:8] + p.suffix
-    return dir_part / short
-
-
-def _make_proxy(url: str) -> GenericProxyConfig | WebshareProxyConfig:
-    """Return a ``GenericProxyConfig`` or ``WebshareProxyConfig`` for *url*."""
-    if url.lower().startswith(("ws://", "webshare://")):
-        creds = url.split("://", 1)[1]
-        user, pwd = creds.split(":", 1)
-        return WebshareProxyConfig(user, pwd)
-    parsed = urlparse(url)
-    if parsed.scheme in ("http", "https"):
-        http_url = urlunparse(parsed._replace(scheme="http"))
-        https_url = urlunparse(parsed._replace(scheme="https"))
-    else:
-        http_url = https_url = url
-    return GenericProxyConfig(http_url=http_url, https_url=https_url)
-
-
-def slug(text: str, max_len: int = 120) -> str:
-    """Return a filesystem-safe, reasonably short slice of a title."""
-    text = _BAD.sub("_", text).strip()
-    text = re.sub(r"\s+", " ", text)
-    if len(text) > max_len:
-        text = text[: max_len].rsplit(" ", 1)[0] + "…"
-    return text or "untitled"
-
-
-def _stats(txt: str) -> tuple[int, int, int]:
-    """
-    Return *(words, lines, chars)* for *txt*.
-
-    • **Lines** are now counted exactly like `wc -l`:  
-      *one* line per ``\n`` byte, so a file without a final newline
-      reports the same number you would see in the shell.
-    """
-    chars  = len(txt)
-    words  = len(re.findall(r"\S+", txt))
-    lines  = txt.count("\n")          # match wc -l
-    return words, lines, chars
-
-
-# ---------- URL detector ------------------------------------ #
-_VID_RE   = re.compile(r"(?:youtu\.be/|v=)([A-Za-z0-9_-]{11})")
-_LIST_RE  = re.compile(r"[?&]list=([A-Za-z0-9_-]+)")
-_CHAN_RE  = re.compile(r"(?:/channel/|/user/|/@)([A-Za-z0-9_-]+)")
-
-
-def detect(url: str):
-    """Return ('video' | 'playlist' | 'channel', identifier-or-url)."""
-    if (m := _VID_RE.search(url)):
-        return "video", m.group(1)
-    if (m := _LIST_RE.search(url)):
-        return "playlist", m.group(1)
-    if _CHAN_RE.search(url) or url.rstrip("/").endswith("/videos"):
-        return "channel", url
-    raise argparse.ArgumentTypeError("Link doesn't look like video/playlist/channel")
-
-
-# ---------- custom formatters --------------------------------------- #
-class TimeStampedText(formatters.TextFormatter):
-    """Plain/pretty formatter that can prefix timestamps."""
-
-    def __init__(self, show: bool = False):
-        super().__init__()
-        self.show = show
-
-    @staticmethod
-    def _ts(sec: float) -> str:
-        td   = timedelta(seconds=sec)
-        base = f"{td}"
-        if "." not in base:
-            base += ".000000"
-        h, m, rest = base.split(":")
-        s, micro   = rest.split(".")
-        return f"{h}:{m}:{s}.{micro[:3]}"
-
-    def format_transcript(self, transcript, **kw):
-        if not self.show:
-            return super().format_transcript(transcript, **kw)
-        # formatter base class expects attribute access
-        return "\n".join(f"[{self._ts(c.start)}] {c.text}" for c in transcript)
-
-
-# Registry (JSON handled manually → no WrappedJSON needed)
-FMT = {
-    "srt":    formatters.SRTFormatter(),
-    "webvtt": formatters.WebVTTFormatter(),
-    "text":   TimeStampedText(),
-    "pretty": TimeStampedText(),
-}
-EXT = {
-    "json":   "json",
-    "srt":    "srt",
-    "webvtt": "vtt",
-    "text":   "txt",
-    "pretty": "txt",
-}
 
 # ───────────────────────── header helpers ──────────────────────────────
 
@@ -284,93 +163,7 @@ def _prepend_header(path: Path, hdr: str):
     path.write_text(hdr + txt, encoding="utf-8")
 
 
-# ───────────────────────── NEW: converter util ──────────────────────────
-def _iter_json_files(path: Path):
-    """Yield every *.json path under the given file/dir."""
-    if path.is_file() and path.suffix.lower() == ".json":
-        yield path
-    elif path.is_dir():
-        for p in path.rglob("*.json"):
-            yield p
 
-
-
-
-# ────────────────────────── helper ──────────────────────────
-def _extract_cues(blob):
-    """
-    Return a flat list of cue-dicts no matter whether *blob* is:
-      •   a normal per-video JSON  (has "transcript")
-      •   one element inside "items" of a concatenated JSON
-      •   a full concatenated JSON (has "items" only)
-    """
-    if "transcript" in blob:                 # single-video file
-        return blob["transcript"]
-    if "items" in blob:                      # concatenated parent
-        cues = []
-        for item in blob["items"]:
-            cues.extend(_extract_cues(item)) # recurse one level
-        return cues
-    return []                                # fallback - no cues
-
-def convert_existing(
-    src: str, dest_fmt: str, out_dir: Path, *, include_stats: bool = True
-):
-    """Convert previously downloaded JSON transcripts to another format."""
-    dest_ext = EXT[dest_fmt]
-    for jfile in _iter_json_files(Path(src).expanduser()):
-        try:
-            data = json.loads(jfile.read_text(encoding="utf-8"))
-        except Exception as e:
-            logging.warning("Skip unreadable JSON %s (%s)", jfile, e)
-            continue
-
-        # Robust cue extraction (handles both per-video and
-        # concatenated JSONs transparently)
-        cues = _extract_cues(data)
-        if not cues:
-            logging.warning("No cues in %s", jfile)
-            continue
-
-        if dest_fmt == "json":
-            new_txt = json.dumps(data, ensure_ascii=False, indent=2)
-            if not new_txt.endswith("\n"):
-                new_txt += "\n"
-        else:
-            # ── mode flags ───────────────────────────────────────────────
-            many_srt = dest_fmt == "srt" and "items" in data and len(data["items"]) > 2
-
-            def _render_one(meta: dict, cue_list):
-                """Render one video; header only when allowed by flags."""
-                txt = FMT[dest_fmt].format_transcript(coerce_attr(cue_list))
-                if include_stats and not many_srt:
-                    txt = _single_file_header(dest_fmt, txt, meta)
-                return txt
-
-            if "items" in data:                 # concatenated JSON
-                parts, meta_acc = [], []
-                for item in data["items"]:
-                    meta = {k: item[k] for k in ("video_id", "title", "url")}
-                    if not many_srt:          # no visual separator in bare-SRT mode
-                        parts.append("──── {video_id} ── {title}\n".format(**meta))
-                    parts.append(_render_one(meta, item["transcript"]))
-                    meta_acc.append((meta["video_id"], meta["title"]))
-                body = "\n".join(parts)
-
-                # optional file-wide header
-                add_header = include_stats and not many_srt
-                if add_header:
-                    hdr, *_ = _fixup_loop(_stats(body), dest_fmt, meta_acc)
-                    new_txt = hdr + body
-                else:
-                    new_txt = body
-            else:                               # single-video JSON
-                meta = {k: data[k] for k in ("video_id", "title", "url")}
-                new_txt = _render_one(meta, cues)
-
-        dst = out_dir / jfile.with_suffix(f".{dest_ext}").name
-        dst.write_text(new_txt, encoding="utf-8")
-        logging.info("✔ converted %s → %s", jfile.name, dst.name)
 
 
 # ───────────────────────── workers ────────────────────────── #
