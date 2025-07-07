@@ -463,9 +463,10 @@ async def _main() -> None:
                    help="Re-download even if output file already exists")
 
     # concatenation & splitting
-    P.add_argument("-C", "--concat", nargs="?", const="combined", metavar="BASENAME",
-                   help="Write all successful transcripts into one file "
-                        "(optional BASENAME; default 'combined')")
+    P.add_argument("-C", "--concat", action="store_true",
+                   help="Write all successful transcripts into one file.")
+    P.add_argument("--basename", default="combined", metavar="NAME",
+                   help="Basename for concatenated file (requires -C).")
     P.add_argument("--split", metavar="N[w|c|l]",
                    help="With --concat: start a new file once N words/chars/lines "
                         "would be exceeded, e.g. --split 12000c. Off by default.")
@@ -858,7 +859,7 @@ async def _main() -> None:
 
     if args.concat and ok:
         logging.info("Per-file stats are disabled during concatenation")
-        base_name    = args.concat
+        base_name    = args.basename
         concat_paths = []
 
         # —— JSON concat (with split) ————————————————————————

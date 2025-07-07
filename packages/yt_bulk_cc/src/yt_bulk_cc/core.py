@@ -84,6 +84,9 @@ def probe_video(
                 if addr:
                     banned.add(addr)
                     logging.info("🚫 banned %s (%s)", label, exc.__class__.__name__)
+                elif label == "direct":
+                    banned.add(label)
+                    logging.info("🚫 banned %s (%s)", label, exc.__class__.__name__)
                 wait = 6 * attempt  # Exponential backoff
                 logging.debug(
                     "⏳ Probe for %s - retrying in %ss (attempt %s/%s)",
@@ -98,6 +101,9 @@ def probe_video(
                 return True, banned  # Other errors are not considered IP blocks
         if addr:
             banned.add(addr)  # If all retries fail, ban the proxy
+            logging.info("🚫 banned %s (failed)", label)
+        elif label == "direct":
+            banned.add(label)
             logging.info("🚫 banned %s (failed)", label)
     return False, banned
 
@@ -208,6 +214,8 @@ async def grab(
                     full = _single_file_header(fmt_key, data, meta)  # type: ignore[arg-type]
                     path.write_text(full, encoding="utf-8")
                 logging.info("✔ saved %s", path.name)
+                if label != "direct":
+                    logging.info("    └── via proxy: %s", label)
                 if delay:
                     await asyncio.sleep(delay)
                 return ("ok", vid, title)
@@ -241,6 +249,7 @@ async def grab(
                         await asyncio.sleep(delay)
                     return ("fail", vid, title)
                 await asyncio.sleep(0.5 * attempt)
+
 
 
 # ---------------------------------------------------------------------------
