@@ -1,7 +1,7 @@
 """
 End-to-end and unit-level tests for yt_bulk_cc.py.
 
-A strict no-network policy is enforced:  YouTubeTranscriptApi.get_transcript,
+A strict no-network policy is enforced:  YouTubeTranscriptApi.fetch,
 scrapetube.get_playlist / get_channel, and the detect() helper are patched with
 in-memory stubs so the suite can run anywhere (CI, air-gapped laptop, etc.).
 
@@ -47,11 +47,20 @@ def fake_cues():
 
 @pytest.fixture
 def patch_transcript(monkeypatch, fake_cues):
-    """Stub out YouTubeTranscriptApi.get_transcript."""
+    """Stub out YouTubeTranscriptApi.fetch."""
     class _FakeApi:
-        @staticmethod
-        def get_transcript(*_, **__):
-            return fake_cues
+        def __init__(self, *a, **kw):
+            pass
+
+        def fetch(self, *_, **__):
+            class _FT:
+                def __init__(self, data):
+                    self._data = data
+
+                def to_raw_data(self):
+                    return self._data
+
+            return _FT(fake_cues)
 
     monkeypatch.setattr(ytb, "YouTubeTranscriptApi", _FakeApi)
     yield
@@ -235,8 +244,10 @@ def test_convert_concat_json(tmp_path: Path, dest_fmt):
 def test_no_caption_flow(monkeypatch, tmp_path):
     """Patch API to raise NoTranscriptFound and ensure graceful summary."""
     class _NoneApi:
-        @staticmethod
-        def get_transcript(video_id, *_, **__):
+        def __init__(self, *a, **kw):
+            pass
+
+        def fetch(self, video_id, *_, **__):
             # Must instantiate with the video_id (mimics real library).
             raise ytb.NoTranscriptFound(video_id)
 
@@ -717,18 +728,25 @@ def test_retry_too_many_requests(monkeypatch, tmp_path: Path, capsys):
 
     calls = {"n": 0}
 
-    def _fake_get_transcript(*_a, **_kw):
+    def _fake_fetch(*_a, **_kw):
         calls["n"] += 1
         if calls["n"] < 3:  # first two attempts → fail
             raise ytb.TooManyRequests("slow down")
         # third attempt → return minimal cue
-        return [{"start": 0.0, "duration": 1.0, "text": "OK"}]
+        class _FT:
+            def to_raw_data(self):
+                return [{"start": 0.0, "duration": 1.0, "text": "OK"}]
 
-    monkeypatch.setattr(
-        ytb,
-        "YouTubeTranscriptApi",
-        type("FakeApi", (), {"get_transcript": staticmethod(_fake_get_transcript)}),
-    )
+        return _FT()
+
+    class _FakeApi:
+        def __init__(self, *a, **kw):
+            pass
+
+        def fetch(self, *a, **kw):
+            return _fake_fetch(*a, **kw)
+
+    monkeypatch.setattr(ytb, "YouTubeTranscriptApi", _FakeApi)
 
     # -v → console log level INFO so the retry line reaches stdout
     run_cli(tmp_path, "dummy", "-f", "text", "-n", "1", "-v")
@@ -746,18 +764,25 @@ def test_retry_ip_blocked(monkeypatch, tmp_path: Path, capsys):
 
     calls = {"n": 0}
 
-    def _fake_get_transcript(*_a, **_kw):
+    def _fake_fetch(*_a, **_kw):
         calls["n"] += 1
         if calls["n"] < 3:  # first two attempts → fail
             raise ytb.IpBlocked("IP blocked")
         # third attempt → return minimal cue
-        return [{"start": 0.0, "duration": 1.0, "text": "OK"}]
+        class _FT:
+            def to_raw_data(self):
+                return [{"start": 0.0, "duration": 1.0, "text": "OK"}]
 
-    monkeypatch.setattr(
-        ytb,
-        "YouTubeTranscriptApi",
-        type("FakeApi", (), {"get_transcript": staticmethod(_fake_get_transcript)}),
-    )
+        return _FT()
+
+    class _FakeApi:
+        def __init__(self, *a, **kw):
+            pass
+
+        def fetch(self, *a, **kw):
+            return _fake_fetch(*a, **kw)
+
+    monkeypatch.setattr(ytb, "YouTubeTranscriptApi", _FakeApi)
 
     # -v → console log level INFO so the retry line reaches stdout
     run_cli(tmp_path, "dummy", "-f", "text", "-n", "1", "-v")

@@ -7,11 +7,12 @@ other modules to keep responsibilities clear.
 from __future__ import annotations
 
 import asyncio
-import inspect
 import logging
 from pathlib import Path
 from random import choice
 from typing import Sequence
+import requests
+from youtube_transcript_api.proxies import GenericProxyConfig
 
 import scrapetube
 from youtube_transcript_api import YouTubeTranscriptApi
@@ -50,23 +51,25 @@ async def grab(
     async with sem:
         for attempt in range(1, tries + 1):
             try:
-                sig_params = inspect.signature(
-                    YouTubeTranscriptApi.get_transcript
-                ).parameters
-                kwargs: dict = {}
-                if langs and "languages" in sig_params:
-                    kwargs["languages"] = list(langs)
-                if proxy_pool and "proxies" in sig_params:
+                proxy = None
+                if proxy_pool:
                     url = proxy_pool[0] if len(proxy_pool) == 1 else choice(proxy_pool)
-                    kwargs["proxies"] = {"http": url, "https": url}
-                if cookies and "cookies" in sig_params:
-                    kwargs["cookies"] = cookies
+                    proxy = GenericProxyConfig(http_url=url, https_url=url)
+
+                session = None
+                if cookies:
+                    session = requests.Session()
+                    for c in cookies:
+                        session.cookies.set(c.get("name"), c.get("value"))
+
+                api = YouTubeTranscriptApi(proxy_config=proxy, http_client=session)
 
                 tr = await asyncio.to_thread(
-                    YouTubeTranscriptApi.get_transcript,
+                    api.fetch,
                     vid,
-                    **kwargs,
+                    languages=list(langs) if langs else ["en"],
                 )
+                tr = tr.to_raw_data()
 
                 meta = {
                     "video_id": vid,
