@@ -1245,5 +1245,5 @@ requires-dist = [
     { name = "typing-extensions", specifier = ">=4.14.0" },
     { name = "urllib3", specifier = ">=2.4.0" },
     { name = "uvloop", specifier = ">=0.21.0" },
-    { name = "youtube-transcript-api", specifier = "==1.1.1" },
+    { name = "youtube-transcript-api", specifier = ">=1.1.1" },
 ]

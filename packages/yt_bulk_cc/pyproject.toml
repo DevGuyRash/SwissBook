@@ -14,7 +14,7 @@ dependencies = [
     "typing-extensions>=4.14.0",
     "urllib3>=2.4.0",
     "uvloop>=0.21.0",
-    "youtube-transcript-api==1.1.1",
+    "youtube-transcript-api>=1.1.1",
 ]
 
 [project.scripts]
