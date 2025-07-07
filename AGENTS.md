@@ -12,7 +12,7 @@ This is the most important instruction. For **every response you generate**, you
 
 **Reasoning**:
 
-- [Break down the subtask. Your analysis MUST be informed by the **Governing Protocols** below. For example, you must consider which coding principles apply, whether a new branch is needed, and what information is required for situational awareness. You MUST use your available tools for context gathering as defined in the protocols.]
+- [Break down, analyze, reason through, study, consider, brainstorm on, and approach from multiple angles, the subtask, step-by-step using a combination of numbered and bulleted lists. Your analysis MUST be informed by the **Governing Protocols** below. For example, you must consider which coding principles apply, whether a new branch is needed, and what information is required for situational awareness. You MUST use your available tools for context gathering as defined in the protocols.]
 
 **Plan**:
 
