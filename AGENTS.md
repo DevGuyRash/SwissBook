@@ -4,7 +4,7 @@
 
 ## Your Operating Cycle and Response Format
 
-This is the most important instruction. For **every response you generate**, you MUST strictly adhere to the following five-part structure. Do not deviate.
+This is the most important instruction. For **every response you generate**, you MUST strictly adhere to the following six-part structure. Do not deviate.
 
 **State**:
 
@@ -17,11 +17,16 @@ This is the most important instruction. For **every response you generate**, you
 **Plan**:
 
 - [Provide a numbered, step-by-step list of the specific, granular actions you will take to accomplish the subtask.]
-- **Justification**: [Explain *why* this plan is the correct and most efficient way to achieve the subtask's goal, referencing the specific instructions below where applicable.]
+
+**Justification (The Confirmation Gate)**:
+
+- [Critically evaluate the `Plan` you just created. Explain *why* it is the correct and most robust approach. This is your final chance to catch errors before execution.]
+- **Self-Correction Trigger**: If, during this justification process, you identify any flaw in your `Plan` (e.g., logical errors, incorrect assumptions, risk of side-effects, a simpler alternative exists), you MUST discard the plan. You will then re-initiate the cycle for the **current subtask**, starting again from the `State` step with a new `Reasoning` phase.
+- [If the plan is sound, present the justification and proceed to Action.]
 
 **Action**:
 
-- [Execute the plan by calling the necessary tools (e.g., `tool_code`). This section should contain ONLY the tool call.]
+- [Execute the plan by calling the necessary tools (e.g., `tool_code`). This section should contain ONLY the tool calls.]
 
 **Verify**:
 
@@ -30,7 +35,7 @@ This is the most important instruction. For **every response you generate**, you
 ## Task Execution Flow
 
 1. **Initial Overall Plan**: Upon receiving a task, your first action is to create and present a high-level, numbered list of the major subtasks required to complete the request. Await user approval before proceeding.
-2. **Subtask Execution**: Execute each subtask from the overall plan using the mandatory `State -> Reasoning -> Plan -> Action -> Verify` cycle.
+2. **Subtask Execution**: Execute each subtask from the overall plan using the mandatory `State -> Reasoning -> Plan -> Justification -> Action -> Verify` cycle.
 3. **Completion**: Once all subtasks are complete and verified, provide a final summary.
 
 ## Git Workflow
@@ -67,7 +72,7 @@ This is a dedicated subtask and must follow the Operating Cycle. The `Plan` for 
 
 ## Coding Instructions
 
-You MUST incorporate these instructions into your `Reasoning` and `Plan` for any subtask that involves writing or modifying code.
+You MUST incorporate these instructions into your `Reasoning`, `Plan`, and `Justification` for any subtask that involves writing or modifying code.
 
 ### Discovery & Dependency Strategy
 
@@ -132,10 +137,10 @@ You MUST incorporate these instructions into your `Reasoning` and `Plan` for any
 
 ## Tiered Error Handling
 
-If any `Action` or `Verify` step fails, you MUST follow this protocol instead of your normal cycle:
+This protocol is for failures that occur _after_ the `Action` step. Pre-execution errors are handled by the `Justification` self-correction trigger.
 
-1. **Tier 1: Tactical Fix**: In your next turn, state the error and your corrected plan. You may only attempt one tactical fix.
-2. **Tier 2: Strategic Reset**: If the fix fails, you MUST revert all changes for the subtask (e.g., `git restore <file>`). Then, start a new `State -> Reasoning -> Plan...` cycle for that same subtask with a different approach.
+1. **Tier 1: Tactical Fix**: If an `Action` or `Verify` step fails, state the error and your corrected plan in the next turn. You may only attempt one tactical fix.
+2. **Tier 2: Strategic Reset**: If the fix fails, you MUST revert all changes for the subtask (e.g., `git restore <file>`). Then, start a new `State -> Reasoning -> ...` cycle for that same subtask with a different approach.
 3. **Tier 3: Abort and Report**: If the reset fails or you have no new approach, you MUST abort. Report the full history of the failure and await instructions.
 
 ## Mode Switches
@@ -149,7 +154,7 @@ If any `Action` or `Verify` step fails, you MUST follow this protocol instead of
     - Follow this workflow if you **ARE** operating within a Git repository.
     - **Multi-Agent Check**: Before executing development subtasks, determine if you have access to specialized agents.
     - **Single-Agent Mode**:
-      1. Execute the `State -> Reasoning -> Plan -> Action -> Verify` loop for each subtask sequentially.
+      1. Execute the `State -> Reasoning -> Plan -> Justification -> Action -> Verify` loop for each subtask sequentially.
       2. If `Verify` passes, proceed to the next subtask automatically.
       3. If `Verify` fails, engage the Tiered Error Handling Protocol.
     - **Multi-Agent Orchestrator Mode**:
@@ -158,13 +163,13 @@ If any `Action` or `Verify` step fails, you MUST follow this protocol instead of
       3. Manage and integrate their work, running tests after each integration.
   - **Filesystem-Based Workflow (Unattended)**
     - Follow this workflow if you **ARE NOT** operating within a Git repository.
-    1. **Setup Sandbox & Backup**: Before the first subtask, create a sandbox and a master backup of all relevant files.
-    2. **Execution & Checkpointing Loop**: For each subtask:
-       - Follow the `State -> Reasoning -> Plan -> Action -> Verify` loop.
-       - Before the `Action` step, create a versioned backup of the file you are about to modify (e.g., `main.py.bak.1`). This is your tactical checkpoint for Tier 2 of the Error Handling Protocol.
-    3. **Completion & Delivery**: Once all subtasks are complete:
-       - Generate a single patch file representing all changes between the master backup and the final code.
-       - Present the patch file to the user. Do not overwrite original files.
+      1. **Setup Sandbox & Backup**: Before the first subtask, create a sandbox and a master backup of all relevant files.
+      2. **Execution & Checkpointing Loop**: For each subtask:
+         - Follow the `State -> Reasoning -> Plan -> Justification -> Action -> Verify` loop.
+         - Before the `Action` step, create a versioned backup of the file you are about to modify (e.g., `main.py.bak.1`). This is your tactical checkpoint for Tier 2 of the Error Handling Protocol.
+      3. **Completion & Delivery**: Once all subtasks are complete:
+         - Generate a single patch file representing all changes between the master backup and the final code.
+         - Present the patch file to the user. Do not overwrite original files.
 
 ### Applying Patches & Diffs
 
