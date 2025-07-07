@@ -646,14 +646,18 @@ async def _main() -> None:
         metavar="URL[,URL2,…]",
         help=(
             "Single proxy URL or comma-separated list to rotate through. "
+            "Include credentials in the URL if needed, e.g. http://user:pass@host:port. "
             "Use ws://user:pass for Webshare residential proxies"
         ),
     )
-    P.add_argument("--proxy-file", metavar="FILE",
-                   help=(
-                       "Load proxies from FILE (one URL per line). "
-                       "Combines with -p when rotating between multiple"
-                   ))
+    P.add_argument(
+        "--proxy-file",
+        metavar="FILE",
+        help=(
+            "Load proxies from FILE (one URL per line). "
+            "Each line may include credentials. Combines with -p when rotating between multiple"
+        ),
+    )
     P.add_argument("-c", "--cookie-json", "--cookie-file", dest="cookie_json",
                    metavar="FILE",
                    help="Cookies JSON exported by browser (see docs)")
