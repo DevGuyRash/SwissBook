@@ -856,15 +856,26 @@ async def _main() -> None:
 
     proxy_pool: list[str] | None = None
     proxies: list[str] = []
+    cli_proxies: list[str] = []
+    file_proxies: list[str] = []
     if args.proxy:
-        proxies.extend(p.strip() for p in args.proxy.split(",") if p.strip())
+        cli_proxies = [p.strip() for p in args.proxy.split(",") if p.strip()]
+        proxies.extend(cli_proxies)
     if args.proxy_file:
         try:
             with open(args.proxy_file, "r", encoding="utf-8") as fh:
-                proxies.extend(p.strip() for p in fh if p.strip())
+                file_proxies = [p.strip() for p in fh if p.strip()]
+                proxies.extend(file_proxies)
         except Exception as e:
             logging.error("Cannot read proxy file %s (%s)", args.proxy_file, e)
             sys.exit(1)
+    if cli_proxies or file_proxies:
+        logging.info(
+            "Loaded %d proxies (CLI %d, file %d)",
+            len(cli_proxies) + len(file_proxies),
+            len(cli_proxies),
+            len(file_proxies),
+        )
 
     proxy_cfg = None
     if proxies:

@@ -74,6 +74,16 @@ def probe_video(
         else:
             addr = url
             proxy = _make_proxy(url) if url else None
+
+        if addr:
+            label = addr
+        elif isinstance(proxy, GenericProxyConfig):
+            label = proxy.http_url
+        elif isinstance(proxy, WebshareProxyConfig):
+            label = "webshare"
+        else:
+            label = "direct"
+
         session = requests.Session()
         session.headers.update({"User-Agent": _pick_ua()})
         if cookies:
@@ -82,16 +92,21 @@ def probe_video(
         api = YouTubeTranscriptApi(proxy_config=proxy, http_client=session)
 
         for attempt in range(1, tries + 1):  # Retry loop
+            logging.info("Probe attempt %d/%d via %s", attempt, tries, label)
             try:
                 api.fetch(vid, languages=["en"])
                 return True, banned
-            except (TooManyRequests, IpBlocked):
+            except (TooManyRequests, IpBlocked) as exc:
                 if addr:
                     banned.add(addr)
+                    logging.info("🚫 banned %s (%s)", label, exc.__class__.__name__)
                 wait = 6 * attempt  # Exponential backoff
-                logging.info(
+                logging.debug(
                     "⏳ Probe for %s - retrying in %ss (attempt %s/%s)",
-                    vid, wait, attempt, tries
+                    vid,
+                    wait,
+                    attempt,
+                    tries,
                 )
                 time.sleep(wait)  # Use time.sleep for synchronous probe
                 continue
@@ -99,6 +114,7 @@ def probe_video(
                 return True, banned  # Other errors are not considered IP blocks
         if addr:
             banned.add(addr)  # If all retries fail, ban the proxy
+            logging.info("🚫 banned %s (failed)", label)
     return False, banned
 
 
@@ -143,6 +159,19 @@ async def grab(
                     proxy = _make_proxy(addr)
                 elif proxy_cfg:
                     proxy = proxy_cfg
+
+                if addr:
+                    label = addr
+                elif isinstance(proxy, GenericProxyConfig):
+                    label = proxy.http_url
+                elif isinstance(proxy, WebshareProxyConfig):
+                    label = "webshare"
+                else:
+                    label = "direct"
+
+                logging.info(
+                    "Download attempt %d/%d via %s", attempt, tries, label
+                )
 
                 session = requests.Session()
                 session.headers.update({"User-Agent": _pick_ua()})
@@ -207,8 +236,9 @@ async def grab(
             except (TooManyRequests, IpBlocked, CouldNotRetrieveTranscript) as exc:
                 if addr:
                     banned.add(addr)
+                    logging.info("🚫 banned %s (%s)", label, exc.__class__.__name__)
                 wait = 6 * attempt
-                logging.info(
+                logging.debug(
                     "⏳ %s - retrying in %ss (attempt %s/%s)",
                     exc.__class__.__name__,
                     wait,
@@ -222,6 +252,7 @@ async def grab(
                     logging.error("%s after %d tries – giving up", exc, attempt)
                     if addr:
                         banned.add(addr)
+                        logging.info("🚫 banned %s (failed)", label)
                     if delay:
                         await asyncio.sleep(delay)
                     return ("fail", vid, title)

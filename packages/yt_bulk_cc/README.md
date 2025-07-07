@@ -110,6 +110,12 @@ proxies rotated between requests. Each URL may include credentials, for example
 `http://user:pass@host:port`. To use Webshare residential proxies pass
 `ws://USER:PASS` as the proxy URL.
 
+At startup the tool logs how many proxies came from the CLI and how many were
+loaded from a file. With `-v` you'll see which proxy is used for each request
+and when one gets banned. The logfile (created automatically unless
+`--no-log` is used) always records the full `-vv` debug output, so detailed
+retry information is preserved even if the console is less verbose.
+
 
 ### Exporting cookies
 
