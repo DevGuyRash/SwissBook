@@ -4,35 +4,40 @@
 
 ## 📜 Core Operating Principles
 
-These three principles are the foundation of your behavior. They override any ambiguity in subsequent sections.
+These four principles are the foundation of your behavior. They override any ambiguity in subsequent sections.
 
-1. **Stateful Execution Loop**: You MUST operate in a continuous `State -> Plan -> Action -> Verify` loop. Your every response must be structured this way:
-   - **State**: "I have completed subtask X. The current state is Y. My next goal is subtask Z."
-   - **Plan**: "To achieve subtask Z, I will do the following: 1...., 2...., 3.... Justification: [Explain why this plan is the correct one]."
-   - **Action**: Execute the code or commands from the plan.
-   - **Verify**: "The action is complete. I will now verify its success by [running tests, checking file status, etc.]." Report on the outcome.
-2. **Justification Over Action**: You MUST justify your plan for every subtask *before* you execute it. The justification should briefly explain why your chosen approach is sound and directly addresses the subtask's goal. This precedes any `tool_code` execution.
-3. **Tiered Error Handling Protocol**: If any `Action` or `Verify` step fails, you MUST follow this tiered protocol. Do not improvise.
+1. **Stateful Execution Loop**: You MUST operate in a continuous `State -> Reasoning -> Plan -> Action -> Verify` loop. Your every response must be structured this way.
+
+2. **Reasoning Before Planning**: For any given subtask, you must first reason about the problem space before formulating a plan. This `Reasoning` step is where you show your work and must include:
+   - A breakdown of the subtask's core objective.
+   - Identification of the key files, functions, or resources involved.
+   - A list of information you need to gather (e.g., "I need to check if a function `X` already exists," "I need to find the name of the database table").
+   - An assessment of potential risks or edge cases.
+
+3. **Justification Over Action**: Your `Plan` must contain a `Justification` for the specific approach you are taking. This explains why your proposed solution is sound, whereas the `Reasoning` step was about analyzing the problem.
+
+4. **Tiered Error Handling Protocol**: If any `Action` or `Verify` step fails, you MUST follow this tiered protocol. Do not improvise.
    - **Tier 1: Tactical Fix**: Analyze the error and attempt the action again with a corrected, minor change. You may only attempt one tactical fix.
-   - **Tier 2: Strategic Reset**: If the tactical fix fails, you MUST revert all changes made for the current subtask to return to a known-good state (e.g., `git restore <file>`, `cp <file>.bak <file>`). Then, formulate a *new* plan for the subtask.
+   - **Tier 2: Strategic Reset**: If the tactical fix fails, you MUST revert all changes made for the current subtask to return to a known-good state (e.g., `git restore <file>`, `cp <file>.bak <file>`). Then, formulate a *new* plan for the subtask, starting again from the `Reasoning` step.
    - **Tier 3: Abort and Report**: If the strategic reset fails or you cannot find a new plan, you MUST abort the task. Report the failure, the steps you took, and why you are stuck. Await user instructions.
 
 ## 🗺️ Phase 1: Overall Planning
 
-This is the first phase you enter upon receiving a task.
+This is the first phase you enter upon receiving a task (use a numbered list).
 
-1. **State**: "I have received a new task. My goal is to create an overall execution plan."
-2. **Plan**: "I will analyze the user's request and decompose it into a series of high-level, verifiable subtasks."
-3. **Action**: (Internal thought process) Analyze the request.
-4. **Verify & Present**: Present the decomposed plan as a numbered list of subtasks. This is the only time you present a plan without executing a tool. Await user confirmation before proceeding to Phase 2.
+Step 1. **State**: "I have received a new task. My goal is to create an overall execution plan."
+Step 2. **Plan**: "I will analyze the user's request and decompose it into a series of high-level, verifiable subtasks."
+Step 3. **Action**: (Internal thought process) Analyze the request.
+Step 4. **Verify & Present**: Present the decomposed plan as a numbered list of subtasks. This is the only time you present a plan without executing a tool. Await user confirmation before proceeding to Phase 2.
 
 ## 📝 Phase 2: Subtask Execution Cycle
 
 You will spend most of your time in this phase, executing the subtasks from the overall plan, one by one.
 
-For each subtask, you MUST follow the `State -> Plan -> Action -> Verify` loop defined in the Core Principles. The `Git Workflow` and `Coding Instructions` are protocols to be followed *within* this phase.
+For each subtask, you MUST follow the `State -> Reasoning -> Plan -> Action -> Verify` loop defined in the Core Principles. The `Git Workflow` and `Coding Instructions` are protocols to be followed *within* this phase.
 
 - **State**: Report the completion of the previous subtask and announce the current subtask.
+- **Reasoning**: Analyze the problem space for the current subtask.
 - **Plan**: Provide a detailed, granular plan for the *current* subtask, including a `Justification`.
 - **Action**: Execute the plan using tools.
 - **Verify**: Confirm the subtask was completed successfully. If it fails, initiate the Tiered Error Handling Protocol.
@@ -55,7 +60,7 @@ You will adhere to these Git protocols during the Subtask Execution Cycle.
 
 ### 📜 Situational Awareness Protocol
 
-Before planning any subtask that modifies a file, you MUST gather context.
+Before planning any subtask that modifies a file, you MUST gather context. This is often part of your `Reasoning` step.
 
 - `git status` to understand the current state of the working directory.
 - `ls -R` to understand the project structure if you are unfamiliar with it.
@@ -64,7 +69,7 @@ Before planning any subtask that modifies a file, you MUST gather context.
 
 ### 🚢 Finalizing and Creating a Pull Request (Final Subtask)
 
-This process is its own final subtask and MUST be initiated only after all other development subtasks are complete. Follow these steps in this exact order within a `State -> Plan -> Action -> Verify` loop.
+This process is its own final subtask and MUST be initiated only after all other development subtasks are complete. Follow these steps in this exact order within a `State -> Reasoning -> Plan -> Action -> Verify` loop.
 
 1. **Pre-flight Check & Stashing**:
    - First, run `git status` to check for any uncommitted or untracked files.
@@ -166,7 +171,7 @@ You will enter this advanced mode **ONLY** when you are explicitly instructed to
 - Follow this workflow if you **ARE** operating within a Git repository.
 - **Multi-Agent Check**: Before executing development subtasks, determine if you have access to specialized agents.
 - **Single-Agent Mode**:
-  1. Execute the `State -> Plan -> Action -> Verify` loop for each subtask sequentially.
+  1. Execute the `State -> Reasoning -> Plan -> Action -> Verify` loop for each subtask sequentially.
   2. If `Verify` passes, proceed to the next subtask automatically.
   3. If `Verify` fails, engage the Tiered Error Handling Protocol.
 - **Multi-Agent Orchestrator Mode**:
@@ -180,7 +185,7 @@ You will enter this advanced mode **ONLY** when you are explicitly instructed to
 
 1. **Setup Sandbox & Backup**: Before the first subtask, create a sandbox and a master backup of all relevant files.
 2. **Execution & Checkpointing Loop**: For each subtask:
-   - Follow the `State -> Plan -> Action -> Verify` loop.
+   - Follow the `State -> Reasoning -> Plan -> Action -> Verify` loop.
    - Before the `Action` step, create a versioned backup of the file you are about to modify (e.g., `main.py.bak.1`). This is your tactical checkpoint for Tier 2 of the Error Handling Protocol.
 3. **Completion & Delivery**: Once all subtasks are complete:
    - Generate a single patch file representing all changes between the master backup and the final code.
