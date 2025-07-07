@@ -40,13 +40,13 @@ def probe_video(
     *,
     cookies: list | None = None,
     proxy_pool: list[str] | None = None,
-) -> bool:
-    """Return ``True`` if ``vid`` can be fetched without IP blocks."""
+    banned: set[str] | None = None,
+) -> tuple[bool, set[str]]:
+    """Return ``(ok, banned_proxies)`` after probing ``vid``."""
+    banned = banned if banned is not None else set()
     proxies = proxy_pool or [None]
     for url in proxies:
-        proxy = (
-            GenericProxyConfig(http_url=url, https_url=url) if url else None
-        )
+        proxy = GenericProxyConfig(http_url=url, https_url=url) if url else None
         session = requests.Session()
         session.headers.update({"User-Agent": _pick_ua()})
         if cookies:
@@ -55,12 +55,14 @@ def probe_video(
         api = YouTubeTranscriptApi(proxy_config=proxy, http_client=session)
         try:
             api.fetch(vid, languages=["en"]).to_raw_data()
-            return True
+            return True, banned
         except (TooManyRequests, IpBlocked):
+            if url:
+                banned.add(url)
             continue
         except Exception:
-            return True
-    return False
+            return True, banned
+    return False, banned
 
 
 async def grab(

@@ -92,7 +92,7 @@ python -m yt_bulk_cc.yt_bulk_cc --convert ./out -f srt -o ./out_srt
 | **Network & Authentication** |                 |                                                                                                                                  |
 | `-p`, `--proxy`              | _(url)_         | A single proxy URL or a comma-separated list to rotate through.                                                                  |
 | `--proxy-file`              | _(file)_        | Load proxies from a file (one URL per line). |
-| `-c`, `--cookie-json`, `--cookie-file`        | _(file)_        | Cookies JSON exported by your browser. |
+| `-c`, `--cookie-json`, `--cookie-file`        | _(file)_        | Cookies JSON exported with a browser extension (see below). |
 | `-s`, `--sleep`              | _(float)_       | Seconds to wait between playlist requests and after each transcript. Default: `2`. |
 | `--check-ip`                |                 | Preflight transcript fetch to detect IP bans before downloading. |
 | **Utilities**                |                 |                                                                                                                                  |
@@ -107,8 +107,8 @@ python -m yt_bulk_cc.yt_bulk_cc --convert ./out -f srt -o ./out_srt
 
 Use a browser extension like **Get cookies.txt** for Chrome or Firefox:
 1. Log into YouTube in your browser.
-2. Use the extension to export cookies for `youtube.com` as JSON.
-3. Pass this file with `-c cookies.json`.
+2. Choose **Export as JSON** for `youtube.com` in the extension menu.
+3. Save the file (e.g. `cookies.json`) and pass it with `-c cookies.json`.
 ---
 
 ## License

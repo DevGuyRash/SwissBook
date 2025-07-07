@@ -842,47 +842,53 @@ async def _main() -> None:
             logging.error("Cannot read cookies file %s (%s)", args.cookie_json, e)
             sys.exit(1)
 
+    pre_results: list[tuple[str, str, str]] = []
+    banned_proxies: set[str] = set()
+
     if args.check_ip:
         from .core import probe_video
         first_vid = videos[0]["videoId"]
-        ok = probe_video(first_vid, cookies=cookies_data, proxy_pool=proxy_pool)
-        if not ok:
-            logging.error("IP appears blocked; aborting")
-            sys.exit(1)
+        ok_probe, banned = probe_video(first_vid, cookies=cookies_data, proxy_pool=proxy_pool)
+        banned_proxies.update(banned)
+        if not ok_probe:
+            logging.error("IP appears blocked; skipping downloads")
+            for v in videos:
+                title = slug(v["title"]["runs"][0]["text"])
+                pre_results.append(("fail", v["videoId"], title))
 
     sem     = asyncio.Semaphore(args.jobs)
     tasks   = []
     skipped = []
-    banned_proxies: set[str] = set()
 
     digits = len(str(len(videos)))       # width for zero-padding
 
-    for idx, v in enumerate(videos, 1):
-        vid   = v["videoId"]
-        title = slug(v["title"]["runs"][0]["text"])
-        prefix = "" if args.no_seq_prefix else f"{idx:0{digits}d} "
-        fpath  = out_dir / f"{prefix}[{vid}] {title}.{EXT[args.format]}"
-        fpath  = _shorten_for_windows(fpath)        # NEW
-        if fpath.exists() and not args.overwrite:
-            skipped.append(("old", vid, title))
-            continue
-        tasks.append(
-            grab(
-                vid,
-                title,
-                fpath,
-                args.language or [],
-                args.format,
-                sem,
-                proxy_pool=proxy_pool,
-                cookies=cookies_data,
-                include_stats=args.stats and not args.concat,
-                delay=args.sleep,
-                banned=banned_proxies,
+    if not pre_results:
+        for idx, v in enumerate(videos, 1):
+            vid   = v["videoId"]
+            title = slug(v["title"]["runs"][0]["text"])
+            prefix = "" if args.no_seq_prefix else f"{idx:0{digits}d} "
+            fpath  = out_dir / f"{prefix}[{vid}] {title}.{EXT[args.format]}"
+            fpath  = _shorten_for_windows(fpath)        # NEW
+            if fpath.exists() and not args.overwrite:
+                skipped.append(("old", vid, title))
+                continue
+            tasks.append(
+                grab(
+                    vid,
+                    title,
+                    fpath,
+                    args.language or [],
+                    args.format,
+                    sem,
+                    proxy_pool=proxy_pool,
+                    cookies=cookies_data,
+                    include_stats=args.stats and not args.concat,
+                    delay=args.sleep,
+                    banned=banned_proxies,
+                )
             )
-        )
 
-    if not tasks and not skipped:
+    if not tasks and not skipped and not pre_results:
         logging.info("Nothing to do (all files already present).")
         return
 
@@ -925,6 +931,8 @@ async def _main() -> None:
                     h.flush()
     except ModuleNotFoundError:
         results = await asyncio.gather(*tasks)
+
+    results = pre_results + results
 
     ok   = [r for r in results if r[0] == "ok"] + skipped
     none = [r for r in results if r[0] == "none"]

@@ -795,10 +795,16 @@ def test_retry_ip_blocked(monkeypatch, tmp_path: Path, capsys):
 
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
-def test_check_ip_bails(monkeypatch, tmp_path: Path):
-    monkeypatch.setattr("yt_bulk_cc.core.probe_video", lambda *a, **k: False)
+def test_check_ip_bails(monkeypatch, tmp_path: Path, capsys):
+    monkeypatch.setattr(
+        "yt_bulk_cc.core.probe_video", lambda *a, **k: (False, {"p"})
+    )
     with pytest.raises(SystemExit):
-        run_cli(tmp_path, "dummy", "-f", "text", "-n", "1", "--check-ip")
+        run_cli(tmp_path, "dummy", "-f", "text", "-n", "2", "--check-ip")
+    out = _strip_ansi(capsys.readouterr().out)
+    assert "Summary:" in out
+    assert "failed 2" in out
+    assert "banned 1" in out
 
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
@@ -807,7 +813,7 @@ def test_check_ip_ok(monkeypatch, tmp_path: Path, patch_transcript):
 
     def probe(*a, **k):
         called["n"] += 1
-        return True
+        return True, set()
 
     monkeypatch.setattr("yt_bulk_cc.core.probe_video", probe)
     run_cli(tmp_path, "dummy", "-f", "text", "-n", "1", "--check-ip")
