@@ -47,6 +47,8 @@ from youtube_transcript_api import YouTubeTranscriptApi, formatters
 from youtube_transcript_api.proxies import GenericProxyConfig, WebshareProxyConfig
 from urllib.parse import urlparse, urlunparse
 import requests
+from rich.console import Console
+from rich.logging import RichHandler
 from .user_agent import _pick_ua
 from .utils import coerce_attr
 # ------------------------------------------------------------
@@ -820,9 +822,15 @@ async def _main() -> None:
     # ────────────── console vs. file log verbosity ──────────────
     console_level = [logging.WARNING, logging.INFO, logging.DEBUG][min(args.verbose, 2)]
 
-    console_handler = logging.StreamHandler(sys.__stdout__)
+    term_console = Console(file=sys.__stdout__, force_terminal=True)
+    console_handler = RichHandler(
+        console=term_console,
+        show_time=False,
+        show_level=True,
+        show_path=False,
+        markup=False,
+    )
     console_handler.setLevel(console_level)
-    console_handler.setFormatter(ColorFormatter("%(levelname)s %(message)s"))
 
     if file_handler:
         # The file should *always* get every detail.
@@ -969,16 +977,14 @@ async def _main() -> None:
             BarColumn,
             TextColumn,
         )
-        from rich.console import Console            # NEW
         async def rich_gather(coros):
-            # Use a dedicated Console that writes **only** to the real TTY,
-            # so progress updates never reach the tee-ed log file.
-            term = Console(file=sys.__stdout__, force_terminal=True)
+            # Use the same Console as the logging handler so progress updates
+            # never reach the tee-ed log file.
             with Progress(
                 SpinnerColumn(),
                 BarColumn(),
                 TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-                console=term,                       # <<< key change
+                console=term_console,
             ) as bar:
                 tid = bar.add_task("Downloading", total=len(coros))
                 res = []
