@@ -94,6 +94,7 @@ python -m yt_bulk_cc.yt_bulk_cc --convert ./out -f srt -o ./out_srt
 | `-c`, `--cookie-json`        | _(file)_        | Path to a cookies JSON file for accessing private/members-only content.                                                          |
 | `-s`, `--sleep`              | _(int)_         | Seconds to wait between pagination requests when scraping. Default: `2`.                                                         |
 | `--delay`                    | _(float)_       | Seconds to wait after each transcript download. |
+| `--bail-on-ip-block`         |                 | Abort immediately if YouTube returns 429/403. |
 | **Utilities**                |                 |                                                                                                                                  |
 | `--convert`                  | _(path)_        | Converts existing JSON transcripts from a file or directory to the specified `-f` format.                                        |
 | `--overwrite`                |                 | Re-download and overwrite files even if they already exist.                                                                      |

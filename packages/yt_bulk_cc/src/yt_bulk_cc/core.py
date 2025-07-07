@@ -48,6 +48,7 @@ async def grab(
     proxy_pool: list[str] | None = None,
     include_stats: bool = True,
     delay: float = 0.0,
+    bail_on_ip_block: bool = False,
 ):
     """Download a single transcript asynchronously and write it to *path*."""
     async with sem:
@@ -116,8 +117,11 @@ async def grab(
                     await asyncio.sleep(delay)
                 return ("none", vid, title)
             except (TooManyRequests, IpBlocked, CouldNotRetrieveTranscript) as exc:
+                if bail_on_ip_block and isinstance(exc, (TooManyRequests, IpBlocked)):
+                    raise
                 wait = 6 * attempt
-                logging.info("⏳ %s - retrying in %ss (attempt %s/%s)",
+                logging.info(
+                    "⏳ %s - retrying in %ss (attempt %s/%s)",
                     exc.__class__.__name__,
                     wait,
                     attempt,

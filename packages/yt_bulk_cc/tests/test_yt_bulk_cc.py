@@ -840,3 +840,30 @@ def test_default_user_agent(monkeypatch, tmp_path: Path):
     run_cli(tmp_path, "https://youtu.be/vidX")
 
     assert captured["ua"] == "UA/123"
+
+
+@pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
+def test_bail_on_ip_block(monkeypatch, tmp_path: Path):
+    """Program must exit if --bail-on-ip-block is set and we hit 429."""
+
+    class _FakeApi:
+        def __init__(self, *a, **kw):
+            pass
+
+        def fetch(self, *a, **kw):
+            raise ytb.IpBlocked("blocked")
+
+    monkeypatch.setattr(ytb, "YouTubeTranscriptApi", _FakeApi)
+
+    sys.argv[:] = [
+        "yt_bulk_cc.py",
+        "dummy",
+        "-f",
+        "text",
+        "--bail-on-ip-block",
+        "-o",
+        str(tmp_path),
+    ]
+
+    with pytest.raises(SystemExit):
+        asyncio.run(ytb.main())

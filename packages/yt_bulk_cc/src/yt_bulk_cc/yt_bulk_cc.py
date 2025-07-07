@@ -370,6 +370,7 @@ async def grab(
     proxy_pool: list[str] | None = None,
     include_stats: bool = True,
     delay: float = 0.0,
+    bail_on_ip_block: bool = False,
 ) -> tuple[str, str, str]:   # (status, video_id, title)
     async with sem:
         for attempt in range(1, tries + 1):
@@ -456,6 +457,8 @@ async def grab(
                 logging.warning("✖ video unavailable %s", vid)
                 return ("fail", vid, title)
             except (TooManyRequests, IpBlocked, CouldNotRetrieveTranscript) as exc:
+                if bail_on_ip_block and isinstance(exc, (TooManyRequests, IpBlocked)):
+                    raise
                 wait = 6 * attempt
                 logging.info(
                     "⏳ %s - retrying in %ss (attempt %s/%s)",
@@ -575,6 +578,8 @@ async def _main() -> None:
                    help="Seconds between scrapetube pagination calls")
     P.add_argument("--delay", type=float, default=0.0,
                    help="Seconds to wait after each transcript download")
+    P.add_argument("--bail-on-ip-block", action="store_true",
+                   help="Abort immediately if YouTube returns 429/403")
     P.add_argument("-v", "--verbose", action="count", default=0,
                    help="-v=info, -vv=debug")
     P.add_argument("--no-seq-prefix", action="store_true",
@@ -835,6 +840,7 @@ async def _main() -> None:
                 cookies=cookies_data,
                 include_stats=args.stats and not args.concat,
                 delay=args.delay,
+                bail_on_ip_block=args.bail_on_ip_block,
             )
         )
 
@@ -873,6 +879,9 @@ async def _main() -> None:
         console_handler.setLevel(logging.ERROR)
         try:
             results = await rich_gather(tasks)
+        except (TooManyRequests, IpBlocked):
+            logging.error("IP appears blocked – aborting early")
+            raise
         finally:
             console_handler.setLevel(orig_console_level)
             # make sure everything buffered in the file handler is flushed
@@ -881,6 +890,9 @@ async def _main() -> None:
                     h.flush()
     except ModuleNotFoundError:
         results = await asyncio.gather(*tasks)
+    except (TooManyRequests, IpBlocked):
+        logging.error("IP appears blocked – aborting early")
+        raise
 
     ok   = [r for r in results if r[0] == "ok"] + skipped
     none = [r for r in results if r[0] == "none"]
@@ -1198,6 +1210,9 @@ async def main() -> None:
         logging.warning("Interrupted by user")
         print(f"\n{C.BLU}Aborted by user{C.END}")
         sys.exit(130)
+    except (TooManyRequests, IpBlocked):
+        logging.error("IP appears blocked – aborting early")
+        sys.exit(2)
 
 
 def cli_entry():
