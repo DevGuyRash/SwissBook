@@ -7,11 +7,10 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Iterable
 
 from .formatters import FMT, EXT
-from .utils import stats, detect  # re-exported for convenience
+from .utils import stats, detect, coerce_attr  # re-exported for convenience
 
 __all__ = [
     "convert_existing",
@@ -33,9 +32,6 @@ def iter_json_files(path: Path | str) -> Iterable[Path]:
         yield from p.rglob("*.json")
 
 
-def coerce_attr(seq):
-    """Ensure each cue allows attribute-style access expected by formatters."""
-    return [SimpleNamespace(**d) if isinstance(d, dict) else d for d in seq]
 
 
 # Recursive flatten helper ----------------------------------------------------

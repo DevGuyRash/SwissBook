@@ -85,15 +85,16 @@ def stats(txt: str) -> tuple[int, int, int]:
 # ---------------------------------------------------------------------------
 
 
-def coerce_attr(seq):
-    """Ensure each cue allows *attribute* access expected by formatters.
+from youtube_transcript_api import FetchedTranscriptSnippet
 
-    The *youtube_transcript_api* library returns a list of *dict*s by default.
-    Most *formatters* in yt_bulk_cc expect those items to expose ``.start`` and
-    ``.text`` attributes.  Wrapping each dict in :class:`types.SimpleNamespace`
-    preserves the original keys while enabling attribute-style access.
-    """
-    return [SimpleNamespace(**d) if isinstance(d, dict) else d for d in seq]
+
+def coerce_attr(seq):
+    """Return cue objects compatible with ``Formatter`` classes."""
+
+    return [
+        FetchedTranscriptSnippet(**d) if isinstance(d, dict) else d
+        for d in seq
+    ]
 
 # ---------------------------------------------------------------------------
 # YouTube URL detector

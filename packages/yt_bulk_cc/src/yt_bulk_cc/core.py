@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Sequence
 import requests
 from youtube_transcript_api.proxies import GenericProxyConfig
+from youtube_transcript_api.proxies import WebshareProxyConfig
+from urllib.parse import urlparse, urlunparse
 from .user_agent import _pick_ua
 
 import scrapetube
@@ -25,8 +27,7 @@ from .errors import (
     IpBlocked,
 )
 from .formatters import FMT
-from .utils import stats, detect, coerce_attr  # type: ignore[attr-defined]
-from .converter import coerce_attr  # fallback if utils misses it
+from .utils import stats, detect
 from . import _single_file_header, _fixup_loop  # type: ignore
 
 __all__ = [
@@ -36,19 +37,43 @@ __all__ = [
 ]
 
 
+def _make_proxy(url: str) -> GenericProxyConfig | WebshareProxyConfig:
+    """Return a ``GenericProxyConfig`` or ``WebshareProxyConfig`` for *url*."""
+    if url.lower().startswith(("ws://", "webshare://")):
+        creds = url.split("://", 1)[1]
+        user, pwd = creds.split(":", 1)
+        return WebshareProxyConfig(user, pwd)
+    parsed = urlparse(url)
+    if parsed.scheme in ("http", "https"):
+        http_url = urlunparse(parsed._replace(scheme="http"))
+        https_url = urlunparse(parsed._replace(scheme="https"))
+    else:
+        http_url = https_url = url
+    return GenericProxyConfig(http_url=http_url, https_url=https_url)
+
+
 def probe_video(
     vid: str,
     *,
     cookies: list | None = None,
     proxy_pool: list[str] | None = None,
+    proxy_cfg: GenericProxyConfig | WebshareProxyConfig | None = None,
     banned: set[str] | None = None,
     tries: int = 3,  # Added tries parameter
 ) -> tuple[bool, set[str]]:
     """Return ``(ok, banned_proxies)`` after probing ``vid``."""
     banned = banned if banned is not None else set()
-    proxies = proxy_pool or [None]
+    if proxy_cfg:
+        proxies = [proxy_cfg]
+    else:
+        proxies = proxy_pool or [None]
     for url in proxies:
-        proxy = GenericProxyConfig(http_url=url, https_url=url) if url else None
+        if isinstance(url, (GenericProxyConfig, WebshareProxyConfig)):
+            proxy = url
+            addr = None
+        else:
+            addr = url
+            proxy = _make_proxy(url) if url else None
         session = requests.Session()
         session.headers.update({"User-Agent": _pick_ua()})
         if cookies:
@@ -58,11 +83,11 @@ def probe_video(
 
         for attempt in range(1, tries + 1):  # Retry loop
             try:
-                api.fetch(vid, languages=["en"]).to_raw_data()
+                api.fetch(vid, languages=["en"])
                 return True, banned
             except (TooManyRequests, IpBlocked):
-                if url:
-                    banned.add(url)
+                if addr:
+                    banned.add(addr)
                 wait = 6 * attempt  # Exponential backoff
                 logging.info(
                     "⏳ Probe for %s - retrying in %ss (attempt %s/%s)",
@@ -72,8 +97,8 @@ def probe_video(
                 continue
             except Exception:
                 return True, banned  # Other errors are not considered IP blocks
-        if url:
-            banned.add(url) # If all retries fail, ban the proxy
+        if addr:
+            banned.add(addr)  # If all retries fail, ban the proxy
     return False, banned
 
 
@@ -88,6 +113,7 @@ async def grab(
     *,
     cookies: list | None = None,
     proxy_pool: list[str] | None = None,
+    proxy_cfg: GenericProxyConfig | WebshareProxyConfig | None = None,
     banned: set[str] | None = None,
     include_stats: bool = True,
     delay: float = 0.0,
@@ -104,17 +130,19 @@ async def grab(
         for attempt in range(1, tries + 1):
             try:
                 proxy = None
-                url = None
+                addr = None
                 if proxy_cycle:
                     for _ in range(len(proxy_pool)):
                         cand = next(proxy_cycle)
                         if cand not in banned:
-                            url = cand
+                            addr = cand
                             break
                     else:
                         logging.error("All proxies appear blocked; abort %s", vid)
                         return ("fail", vid, title)
-                    proxy = GenericProxyConfig(http_url=url, https_url=url)
+                    proxy = _make_proxy(addr)
+                elif proxy_cfg:
+                    proxy = proxy_cfg
 
                 session = requests.Session()
                 session.headers.update({"User-Agent": _pick_ua()})
@@ -129,7 +157,7 @@ async def grab(
                     vid,
                     languages=list(langs) if langs else ["en"],
                 )
-                tr = tr.to_raw_data()
+                fmt_tr = tr if hasattr(tr, "__iter__") else coerce_attr(tr.to_raw_data())
 
                 meta = {
                     "video_id": vid,
@@ -141,7 +169,10 @@ async def grab(
                 if fmt_key == "json":
                     import json
 
-                    payload = dict(meta, transcript=tr)
+                    payload = dict(
+                        meta,
+                        transcript=tr.to_raw_data() if hasattr(tr, "to_raw_data") else tr,
+                    )
                     if include_stats:
                         for _ in range(3):
                             tmp = json.dumps(payload, indent=2, ensure_ascii=False)
@@ -156,7 +187,7 @@ async def grab(
                     if not data.endswith("\n"):
                         data += "\n"
                 else:
-                    data = FMT[fmt_key].format_transcript(coerce_attr(tr))
+                    data = FMT[fmt_key].format_transcript(fmt_tr)
 
                 if fmt_key == "json" or not include_stats:
                     path.write_text(data, encoding="utf-8")
@@ -174,8 +205,8 @@ async def grab(
                     await asyncio.sleep(delay)
                 return ("none", vid, title)
             except (TooManyRequests, IpBlocked, CouldNotRetrieveTranscript) as exc:
-                if url:
-                    banned.add(url)
+                if addr:
+                    banned.add(addr)
                 wait = 6 * attempt
                 logging.info(
                     "⏳ %s - retrying in %ss (attempt %s/%s)",
@@ -189,8 +220,8 @@ async def grab(
             except Exception as exc:
                 if attempt == tries:
                     logging.error("%s after %d tries – giving up", exc, attempt)
-                    if url:
-                        banned.add(url)
+                    if addr:
+                        banned.add(addr)
                     if delay:
                         await asyncio.sleep(delay)
                     return ("fail", vid, title)

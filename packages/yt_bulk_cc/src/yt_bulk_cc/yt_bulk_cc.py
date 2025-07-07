@@ -39,15 +39,16 @@ import textwrap
 from datetime import timedelta
 from pathlib import Path
 from random import choice
-from types import SimpleNamespace
 import copy          # NEW
 from typing import Sequence
 
 import scrapetube
 from youtube_transcript_api import YouTubeTranscriptApi, formatters
-from youtube_transcript_api.proxies import GenericProxyConfig
+from youtube_transcript_api.proxies import GenericProxyConfig, WebshareProxyConfig
+from urllib.parse import urlparse, urlunparse
 import requests
 from .user_agent import _pick_ua
+from .utils import coerce_attr
 # ------------------------------------------------------------
 #  Robust error-class import — works on every library version
 # ------------------------------------------------------------
@@ -76,12 +77,13 @@ def _shorten_for_windows(p: Path) -> Path:
     """
     if os.name != "nt":
         return p
-    MAX = 250                                # a bit under the hard limit
+
+    MAX = 250  # a bit under the hard limit
     if len(str(p)) <= MAX:
         return p
 
-    dir_part  = p.parent
-    base      = p.name
+    dir_part = p.parent
+    base = p.name
     m = re.match(r"(\d+ )?\[([A-Za-z0-9_-]{11})\] (.+)\.(\w+)", base)
     if m:
         prefix, vid, title, ext = m.groups()
@@ -92,8 +94,24 @@ def _shorten_for_windows(p: Path) -> Path:
             return candidate
 
     import hashlib
+
     short = hashlib.md5(base.encode()).hexdigest()[:8] + p.suffix
     return dir_part / short
+
+
+def _make_proxy(url: str) -> GenericProxyConfig | WebshareProxyConfig:
+    """Return a ``GenericProxyConfig`` or ``WebshareProxyConfig`` for *url*."""
+    if url.lower().startswith(("ws://", "webshare://")):
+        creds = url.split("://", 1)[1]
+        user, pwd = creds.split(":", 1)
+        return WebshareProxyConfig(user, pwd)
+    parsed = urlparse(url)
+    if parsed.scheme in ("http", "https"):
+        http_url = urlunparse(parsed._replace(scheme="http"))
+        https_url = urlunparse(parsed._replace(scheme="https"))
+    else:
+        http_url = https_url = url
+    return GenericProxyConfig(http_url=http_url, https_url=https_url)
 
 
 def slug(text: str, max_len: int = 120) -> str:
@@ -274,9 +292,6 @@ def _iter_json_files(path: Path):
             yield p
 
 
-def _coerce_attr(seq):
-    """Ensure each cue allows attribute access needed by formatters."""
-    return [SimpleNamespace(**d) if isinstance(d, dict) else d for d in seq]
 
 
 # ────────────────────────── helper ──────────────────────────
@@ -325,7 +340,7 @@ def convert_existing(
 
             def _render_one(meta: dict, cue_list):
                 """Render one video; header only when allowed by flags."""
-                txt = FMT[dest_fmt].format_transcript(_coerce_attr(cue_list))
+                txt = FMT[dest_fmt].format_transcript(coerce_attr(cue_list))
                 if include_stats and not many_srt:
                     txt = _single_file_header(dest_fmt, txt, meta)
                 return txt
@@ -368,6 +383,7 @@ async def grab(
     *,
     cookies: list | None = None,
     proxy_pool: list[str] | None = None,
+    proxy_cfg: GenericProxyConfig | WebshareProxyConfig | None = None,
     banned: set[str] | None = None,
     include_stats: bool = True,
     delay: float = 0.0,
@@ -383,17 +399,19 @@ async def grab(
         for attempt in range(1, tries + 1):
             try:
                 proxy = None
-                url = None
+                addr = None
                 if proxy_cycle:
                     for _ in range(len(proxy_pool)):
                         cand = next(proxy_cycle)
                         if cand not in banned:
-                            url = cand
+                            addr = cand
                             break
                     else:
                         logging.error("All proxies appear blocked; abort %s", vid)
                         return ("fail", vid, title)
-                    proxy = GenericProxyConfig(http_url=url, https_url=url)
+                    proxy = _make_proxy(addr)
+                elif proxy_cfg:
+                    proxy = proxy_cfg
 
                 session = requests.Session()
                 session.headers.update({"User-Agent": _pick_ua()})
@@ -408,7 +426,7 @@ async def grab(
                     vid,
                     languages=list(langs) if langs else ["en"],
                 )
-                tr = tr.to_raw_data()
+                fmt_tr = tr if hasattr(tr, "__iter__") else coerce_attr(tr.to_raw_data())
 
                 meta = {
                     "video_id": vid,
@@ -418,7 +436,10 @@ async def grab(
                 }
 
                 if fmt_key == "json":
-                    payload = dict(meta, transcript=tr)
+                    payload = dict(
+                        meta,
+                        transcript=tr.to_raw_data() if hasattr(tr, "to_raw_data") else tr,
+                    )
 
                     # embed per-file stats unless we know we'll concatenate later
                     if include_stats:
@@ -440,7 +461,7 @@ async def grab(
                     if not data.endswith("\n"):
                         data += "\n"
                 else:
-                    data = FMT[fmt_key].format_transcript(_coerce_attr(tr))
+                    data = FMT[fmt_key].format_transcript(fmt_tr)
 
                 if fmt_key == "json" or not include_stats:
                     # JSON, or stats explicitly disabled → dump verbatim
@@ -472,8 +493,8 @@ async def grab(
                 logging.warning("✖ video unavailable %s", vid)
                 return ("fail", vid, title)
             except (TooManyRequests, IpBlocked, CouldNotRetrieveTranscript) as exc:
-                if url:
-                    banned.add(url)
+                if addr:
+                    banned.add(addr)
                 wait = 6 * attempt
                 logging.info(
                     "⏳ %s - retrying in %ss (attempt %s/%s)",
@@ -487,8 +508,8 @@ async def grab(
             except Exception as exc:
                 if attempt == tries:
                     logging.error("%s after %d tries – giving up", exc, attempt)
-                    if url:
-                        banned.add(url)
+                    if addr:
+                        banned.add(addr)
                     if delay:
                         await asyncio.sleep(delay)
                     return ("fail", vid, title)
@@ -619,10 +640,24 @@ async def _main() -> None:
     # misc helpers
     P.add_argument("-F", "--formats-help", action="store_true",
                    help="Show examples of each output format and exit")
-    P.add_argument("-p", "--proxy", metavar="URL[,URL2,…]",
-                   help="Single proxy or comma-list to rotate between")
-    P.add_argument("--proxy-file", metavar="FILE",
-                   help="File containing one proxy URL per line")
+    P.add_argument(
+        "-p",
+        "--proxy",
+        metavar="URL[,URL2,…]",
+        help=(
+            "Single proxy URL or comma-separated list to rotate through. "
+            "Include credentials in the URL if needed, e.g. http://user:pass@host:port. "
+            "Use ws://user:pass for Webshare residential proxies"
+        ),
+    )
+    P.add_argument(
+        "--proxy-file",
+        metavar="FILE",
+        help=(
+            "Load proxies from FILE (one URL per line). "
+            "Each line may include credentials. Combines with -p when rotating between multiple"
+        ),
+    )
     P.add_argument("-c", "--cookie-json", "--cookie-file", dest="cookie_json",
                    metavar="FILE",
                    help="Cookies JSON exported by browser (see docs)")
@@ -830,8 +865,25 @@ async def _main() -> None:
         except Exception as e:
             logging.error("Cannot read proxy file %s (%s)", args.proxy_file, e)
             sys.exit(1)
+
+    proxy_cfg = None
     if proxies:
-        proxy_pool = proxies
+        if len(proxies) == 1:
+            entry = proxies[0]
+            if entry.lower().startswith(("ws://", "webshare://")):
+                creds = entry.split("://", 1)[1]
+                try:
+                    user, pwd = creds.split(":", 1)
+                except ValueError:
+                    logging.error("Webshare proxy requires ws://user:pass")
+                    sys.exit(1)
+                proxy_cfg = WebshareProxyConfig(user, pwd)
+            else:
+                proxy_cfg = _make_proxy(entry)
+        else:
+            proxy_pool = proxies
+    if proxy_pool and proxy_cfg:
+        logging.debug("Single proxy supplied; ignoring proxy list")
 
     cookies_data: list | None = None
     if args.cookie_json:
@@ -848,7 +900,13 @@ async def _main() -> None:
     if args.check_ip:
         from .core import probe_video
         first_vid = videos[0]["videoId"]
-        ok_probe, banned_proxies = probe_video(first_vid, cookies=cookies_data, proxy_pool=proxy_pool, banned=banned_proxies)
+        ok_probe, banned_proxies = probe_video(
+            first_vid,
+            cookies=cookies_data,
+            proxy_pool=proxy_pool,
+            proxy_cfg=proxy_cfg,
+            banned=banned_proxies,
+        )
         if not ok_probe:
             logging.error("IP appears blocked; aborting")
             for v in videos:
@@ -880,6 +938,7 @@ async def _main() -> None:
                     args.format,
                     sem,
                     proxy_pool=proxy_pool,
+                    proxy_cfg=proxy_cfg,
                     cookies=cookies_data,
                     include_stats=args.stats and not args.concat,
                     delay=args.sleep,
