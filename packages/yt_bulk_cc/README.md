@@ -93,8 +93,7 @@ python -m yt_bulk_cc.yt_bulk_cc --convert ./out -f srt -o ./out_srt
 | `-p`, `--proxy`              | _(url)_         | A single proxy URL or a comma-separated list to rotate through.                                                                  |
 | `--proxy-file`              | _(file)_        | Load proxies from a file (one URL per line). |
 | `-c`, `--cookie-json`, `--cookie-file`        | _(file)_        | Cookies JSON exported by your browser. |
-| `-s`, `--sleep`              | _(int)_         | Seconds to wait between pagination requests when scraping. Default: `2`.                                                         |
-| `--delay`                    | _(float)_       | Seconds to wait after each transcript download. |
+| `-s`, `--sleep`              | _(float)_       | Seconds to wait between playlist requests and after each transcript. Default: `2`. |
 | `--check-ip`                |                 | Preflight transcript fetch to detect IP bans before downloading. |
 | **Utilities**                |                 |                                                                                                                                  |
 | `--convert`                  | _(path)_        | Converts existing JSON transcripts from a file or directory to the specified `-f` format.                                        |
@@ -104,6 +103,12 @@ python -m yt_bulk_cc.yt_bulk_cc --convert ./out -f srt -o ./out_srt
 | `--no-log`                   |                 | Disable file logging entirely.                                                                                                   |
 | `-F`, `--formats-help`       |                 | Show examples of each output format and exit.                                                                                    |
 
+### Exporting cookies
+
+Use a browser extension like **Get cookies.txt** for Chrome or Firefox:
+1. Log into YouTube in your browser.
+2. Use the extension to export cookies for `youtube.com` as JSON.
+3. Pass this file with `-c cookies.json`.
 ---
 
 ## License

@@ -368,15 +368,31 @@ async def grab(
     *,
     cookies: list | None = None,
     proxy_pool: list[str] | None = None,
+    banned: set[str] | None = None,
     include_stats: bool = True,
     delay: float = 0.0,
 ) -> tuple[str, str, str]:   # (status, video_id, title)
     async with sem:
+        proxy_cycle = None
+        if proxy_pool:
+            from itertools import cycle
+
+            proxy_cycle = cycle(proxy_pool)
+        banned = banned if banned is not None else set()
+
         for attempt in range(1, tries + 1):
             try:
                 proxy = None
-                if proxy_pool:
-                    url = proxy_pool[0] if len(proxy_pool) == 1 else choice(proxy_pool)
+                url = None
+                if proxy_cycle:
+                    for _ in range(len(proxy_pool)):
+                        cand = next(proxy_cycle)
+                        if cand not in banned:
+                            url = cand
+                            break
+                    else:
+                        logging.error("All proxies appear blocked; abort %s", vid)
+                        return ("fail", vid, title)
                     proxy = GenericProxyConfig(http_url=url, https_url=url)
 
                 session = requests.Session()
@@ -456,6 +472,8 @@ async def grab(
                 logging.warning("✖ video unavailable %s", vid)
                 return ("fail", vid, title)
             except (TooManyRequests, IpBlocked, CouldNotRetrieveTranscript) as exc:
+                if url:
+                    banned.add(url)
                 wait = 6 * attempt
                 logging.info(
                     "⏳ %s - retrying in %ss (attempt %s/%s)",
@@ -469,6 +487,8 @@ async def grab(
             except Exception as exc:
                 if attempt == tries:
                     logging.error("%s after %d tries – giving up", exc, attempt)
+                    if url:
+                        banned.add(url)
                     if delay:
                         await asyncio.sleep(delay)
                     return ("fail", vid, title)
@@ -519,12 +539,13 @@ class ColorFormatter(logging.Formatter):
             rec.msg = f"{color}{rec.getMessage()}{C.END}"
             rec.args = ()
 
-        if rec.msg.startswith("Summary:") and len(rec.args) == 4:
-            ok, none, fail, total = rec.args
+        if rec.msg.startswith("Summary:") and len(rec.args) == 5:
+            ok, none, fail, banned, total = rec.args
             rec.msg = (
                 f"Summary: ✓ {C.GRN}{ok}{C.END}   •  "
                 f"↯ no-caption {C.YEL}{none}{C.END}   •  "
                 f"⚠ failed {C.RED}{fail}{C.END}   "
+                f"🚫 banned {C.RED}{banned}{C.END}   "
                 f"(total {total})"
             )
             rec.args = ()
@@ -571,10 +592,8 @@ async def _main() -> None:
                    help="Stop after N videos (handy for testing)")
     P.add_argument("-j", "--jobs", type=int, default=1,
                    help="Concurrent transcript downloads")
-    P.add_argument("-s", "--sleep", type=int, default=3,
-                   help="Seconds between scrapetube pagination calls")
-    P.add_argument("--delay", type=float, default=0.0,
-                   help="Seconds to wait after each transcript download")
+    P.add_argument("-s", "--sleep", type=float, default=2.0,
+                   help="Seconds to wait between requests and after each download")
     P.add_argument("-v", "--verbose", action="count", default=0,
                    help="-v=info, -vv=debug")
     P.add_argument("--no-seq-prefix", action="store_true",
@@ -834,6 +853,7 @@ async def _main() -> None:
     sem     = asyncio.Semaphore(args.jobs)
     tasks   = []
     skipped = []
+    banned_proxies: set[str] = set()
 
     digits = len(str(len(videos)))       # width for zero-padding
 
@@ -857,7 +877,8 @@ async def _main() -> None:
                 proxy_pool=proxy_pool,
                 cookies=cookies_data,
                 include_stats=args.stats and not args.concat,
-                delay=args.delay,
+                delay=args.sleep,
+                banned=banned_proxies,
             )
         )
 
@@ -941,14 +962,15 @@ async def _main() -> None:
         sys.stdout.flush()
         # Emit the roll-up *after* the lists.
         logging.info(
-            "Summary: ✓ %s   •  ↯ no-caption %s   •  ⚠ failed %s   (total %s)",
-            len(ok), len(none), len(fail), len(ok) + len(none) + len(fail),
+            "Summary: ✓ %s   •  ↯ no-caption %s   •  ⚠ failed %s   •  🚫 banned %s   (total %s)",
+            len(ok), len(none), len(fail), len(banned_proxies), len(ok) + len(none) + len(fail),
         )
         # plain echo guarantees the final line is literally "Summary: …"
         print(
             f"Summary: ✓ {C.GRN}{len(ok)}{C.END}   •  "
             f"↯ no-caption {C.YEL}{len(none)}{C.END}   •  "
             f"⚠ failed {C.RED}{len(fail)}{C.END}   "
+            f"🚫 banned {C.RED}{len(banned_proxies)}{C.END}   "
             f"(total {len(ok)+len(none)+len(fail)})"
         )
         sys.stdout.flush()

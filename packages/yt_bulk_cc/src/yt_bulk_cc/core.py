@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
-from random import choice
 from typing import Sequence
 import requests
 from youtube_transcript_api.proxies import GenericProxyConfig
@@ -43,25 +42,25 @@ def probe_video(
     proxy_pool: list[str] | None = None,
 ) -> bool:
     """Return ``True`` if ``vid`` can be fetched without IP blocks."""
-    proxy = None
-    if proxy_pool:
-        url = proxy_pool[0] if len(proxy_pool) == 1 else choice(proxy_pool)
-        proxy = GenericProxyConfig(http_url=url, https_url=url)
-
-    session = requests.Session()
-    session.headers.update({"User-Agent": _pick_ua()})
-    if cookies:
-        for c in cookies:
-            session.cookies.set(c.get("name"), c.get("value"))
-
-    api = YouTubeTranscriptApi(proxy_config=proxy, http_client=session)
-    try:
-        api.fetch(vid, languages=["en"]).to_raw_data()
-    except (TooManyRequests, IpBlocked):
-        return False
-    except Exception:
-        return True
-    return True
+    proxies = proxy_pool or [None]
+    for url in proxies:
+        proxy = (
+            GenericProxyConfig(http_url=url, https_url=url) if url else None
+        )
+        session = requests.Session()
+        session.headers.update({"User-Agent": _pick_ua()})
+        if cookies:
+            for c in cookies:
+                session.cookies.set(c.get("name"), c.get("value"))
+        api = YouTubeTranscriptApi(proxy_config=proxy, http_client=session)
+        try:
+            api.fetch(vid, languages=["en"]).to_raw_data()
+            return True
+        except (TooManyRequests, IpBlocked):
+            continue
+        except Exception:
+            return True
+    return False
 
 
 async def grab(
@@ -75,16 +74,32 @@ async def grab(
     *,
     cookies: list | None = None,
     proxy_pool: list[str] | None = None,
+    banned: set[str] | None = None,
     include_stats: bool = True,
     delay: float = 0.0,
 ):
     """Download a single transcript asynchronously and write it to *path*."""
     async with sem:
+        proxy_cycle = None
+        if proxy_pool:
+            from itertools import cycle
+
+            proxy_cycle = cycle(proxy_pool)
+        banned = banned if banned is not None else set()
+
         for attempt in range(1, tries + 1):
             try:
                 proxy = None
-                if proxy_pool:
-                    url = proxy_pool[0] if len(proxy_pool) == 1 else choice(proxy_pool)
+                url = None
+                if proxy_cycle:
+                    for _ in range(len(proxy_pool)):
+                        cand = next(proxy_cycle)
+                        if cand not in banned:
+                            url = cand
+                            break
+                    else:
+                        logging.error("All proxies appear blocked; abort %s", vid)
+                        return ("fail", vid, title)
                     proxy = GenericProxyConfig(http_url=url, https_url=url)
 
                 session = requests.Session()
@@ -145,8 +160,11 @@ async def grab(
                     await asyncio.sleep(delay)
                 return ("none", vid, title)
             except (TooManyRequests, IpBlocked, CouldNotRetrieveTranscript) as exc:
+                if url:
+                    banned.add(url)
                 wait = 6 * attempt
-                logging.info("⏳ %s - retrying in %ss (attempt %s/%s)",
+                logging.info(
+                    "⏳ %s - retrying in %ss (attempt %s/%s)",
                     exc.__class__.__name__,
                     wait,
                     attempt,
@@ -157,6 +175,8 @@ async def grab(
             except Exception as exc:
                 if attempt == tries:
                     logging.error("%s after %d tries – giving up", exc, attempt)
+                    if url:
+                        banned.add(url)
                     if delay:
                         await asyncio.sleep(delay)
                     return ("fail", vid, title)
@@ -175,9 +195,9 @@ def video_iter(kind: str, ident: str, limit: int | None, pause: int):
         return
 
     if kind == "playlist":
-        vid_dicts = scrapetube.get_playlist(ident, limit=limit or 0)
+        vid_dicts = scrapetube.get_playlist(ident, limit=limit or 0, sleep=pause)
     else:  # channel
-        vid_dicts = scrapetube.get_channel(ident, limit=limit or 0)
+        vid_dicts = scrapetube.get_channel(channel_url=ident, limit=limit or 0, sleep=pause)
 
     for d in vid_dicts:
         vid = d["videoId"]
