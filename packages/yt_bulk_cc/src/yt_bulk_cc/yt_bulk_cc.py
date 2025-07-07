@@ -451,18 +451,12 @@ async def grab(
             except VideoUnavailable:
                 logging.warning("✖ video unavailable %s", vid)
                 return ("fail", vid, title)
-            except (TooManyRequests, CouldNotRetrieveTranscript) as exc:
+            except (TooManyRequests, IpBlocked, CouldNotRetrieveTranscript) as exc:
                 wait = 6 * attempt
                 logging.info("⏳ %s - retrying in %ss (attempt %s/%s)",
                              exc.__class__.__name__, wait, attempt, tries)
                 await asyncio.sleep(wait)
                 continue
-            
-                logging.debug("retry %s/%s for %s: %s", attempt, tries, vid, exc)
-                if attempt == tries:
-                    logging.error("⚠ giving up on %s (%s)", vid, exc.__class__.__name__)
-                else:
-                    await asyncio.sleep(1.5 * attempt)
         return ("fail", vid, title)
 
 
@@ -557,7 +551,7 @@ async def _main() -> None:
                    help="Prefix each cue with [hh:mm:ss.mmm] in text / pretty modes")
     P.add_argument("-n", "--limit", type=int,
                    help="Stop after N videos (handy for testing)")
-    P.add_argument("-j", "--jobs", type=int, default=2,
+    P.add_argument("-j", "--jobs", type=int, default=1,
                    help="Concurrent transcript downloads")
     P.add_argument("-s", "--sleep", type=int, default=3,
                    help="Seconds between scrapetube pagination calls")

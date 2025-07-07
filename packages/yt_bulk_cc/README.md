@@ -82,7 +82,7 @@ python -m yt_bulk_cc.yt_bulk_cc --convert ./out -f srt -o ./out_srt
 | `-l`, `--language`           | _(code)_        | Preferred language code (e.g., `en`, `es`). Can be repeated for fallback priority.                                               |
 | `-f`, `--format`             | _(name)_        | Output format: `json`, `srt`, `webvtt`, `text`, `pretty`. Default: `json`.                                                       |
 | `-n`, `--limit`              | _(int)_         | Stop after processing N videos from a playlist or channel.                                                                       |
-| `-j`, `--jobs`               | _(int)_         | Number of concurrent transcript downloads. Default: `2`.                                                                         |
+| `-j`, `--jobs`               | _(int)_         | Number of concurrent transcript downloads. Default: `1`.                                                                         |
 | **Output & Formatting**      |                 |                                                                                                                                  |
 | `-t`, `--timestamps`         |                 | Adds `[hh:mm:ss.mmm]` timestamps to `text` format.                                                                               |
 | `--no-seq-prefix`            |                 | Disables the `00001-` numeric prefix on filenames.                                                                               |
