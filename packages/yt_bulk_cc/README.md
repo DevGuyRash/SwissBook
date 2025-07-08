@@ -93,6 +93,9 @@ python -m yt_bulk_cc.yt_bulk_cc --convert ./out -f srt -o ./out_srt
 | **Network & Authentication** |                 |                                                                                                                                  |
 | `-p`, `--proxy`              | _(url)_         | Single proxy URL or comma-separated list to rotate through. Use `ws://user:pass` for Webshare. |
 | `--proxy-file`              | _(file)_        | Load additional proxies from a file (one URL per line). |
+| `--public-proxy [N]`        |                 | Fetch N free proxies (default 5) using Swiftshadow or a SOCKS list. |
+| `--public-proxy-country`    | _(CC[,CC])_     | Restrict public proxies to these country codes. |
+| `--public-proxy-type`       | _(http\|https\|socks)_ | Protocol for public proxies. Auto-selected if omitted. |
 | `-c`, `--cookie-json`, `--cookie-file`        | _(file)_        | Cookies JSON exported with a browser extension (see below). |
 | `-s`, `--sleep`              | _(float)_       | Seconds to wait between playlist requests and after each transcript. Default: `2`. |
 | `--check-ip`                |                 | Preflight transcript fetch to detect IP bans before downloading. |
@@ -105,16 +108,7 @@ python -m yt_bulk_cc.yt_bulk_cc --convert ./out -f srt -o ./out_srt
 | `-F`, `--formats-help`       |                 | Show examples of each output format and exit. |
 ### Proxy usage
 
-Use `-p`/`--proxy` and `--proxy-file` to provide a single proxy or a list of
-proxies rotated between requests. Each URL may include credentials, for example
-`http://user:pass@host:port`. To use Webshare residential proxies pass
-`ws://USER:PASS` as the proxy URL.
-
-At startup the tool logs how many proxies came from the CLI and how many were
-loaded from a file. With `-v` you'll see which proxy is used for each request
-and when one gets banned. The logfile (created automatically unless
-`--no-log` is used) always records the full `-vv` debug output, so detailed
-retry information is preserved even if the console is less verbose.
+Use `-p`/`--proxy` and `--proxy-file` to provide a single proxy or a rotation list. Each URL may include credentials, for example `http://user:pass@host:port`. To use Webshare residential proxies pass `ws://USER:PASS` as the proxy URL. With `--public-proxy` the tool fetches a small pool of free proxies; you can pass a number as `--public-proxy N` or `--public-proxy=N` (default 5). Use `--public-proxy-country` and `--public-proxy-type` to refine the pool. User-supplied proxies always take precedence, with public ones used as a fallback. At startup the tool logs how many proxies came from the CLI and how many were loaded from a file. With `-v` you'll see which proxy is used for each request and when one gets banned. The logfile (created automatically unless `--no-log` is used) always records the full `-vv` debug output, so detailed retry information is preserved even if the console is less verbose.
 
 
 ### Exporting cookies

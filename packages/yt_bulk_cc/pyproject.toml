@@ -17,6 +17,7 @@ dependencies = [
     "youtube-transcript-api>=1.1.1",
     "fake-useragent>=2.2",
     "faker>=24.11",
+    "swiftshadow>=2.2",
 ]
 
 [project.scripts]

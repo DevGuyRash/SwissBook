@@ -15,6 +15,7 @@ import re
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -1002,6 +1003,7 @@ def test_proxy_pool(monkeypatch, tmp_path: Path):
 
     async def _fake_grab(*_a, **kw):
         captured["pool"] = kw.get("proxy_pool")
+        captured["cfg"] = kw.get("proxy_cfg")
         return ("ok", "x", "t")
 
     monkeypatch.setattr(ytb, "grab", _fake_grab)
@@ -1122,3 +1124,149 @@ def test_proxy_file_rotation(monkeypatch, tmp_path: Path, capsys):
     assert used[:2] == ["http://cli", "http://f1"]
     out = _strip_ansi(capsys.readouterr().out)
     assert "banned 1" in out
+
+
+@pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
+def test_public_proxy(monkeypatch, tmp_path: Path):
+    captured: dict[str, Any] = {}
+
+    class _PI:
+        def __init__(self, *a, **k):
+            _PI.called = True
+            captured.update(k)
+            self.proxies = [SimpleNamespace(as_string=lambda: "http://pub:1")]
+
+    monkeypatch.setattr(ytb, "ProxyInterface", _PI)
+    monkeypatch.setattr(ytb, "choice", lambda seq: seq[0])
+
+    async def _fake_grab(*_a, **kw):
+        captured["pool"] = kw.get("proxy_pool")
+        return ("ok", "x", "t")
+
+    monkeypatch.setattr(ytb, "grab", _fake_grab)
+
+    _PI.called = False
+    run_cli(tmp_path, "dummy", "--public-proxy", "3", "-n", "1")
+
+    assert _PI.called
+    assert captured["maxProxies"] == 3
+    assert captured["protocol"] == "http"
+
+
+@pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
+def test_public_proxy_with_cli(monkeypatch, tmp_path: Path):
+    captured = {}
+
+    class _PI:
+        def __init__(self, *a, **k):
+            _PI.called = True
+            self.proxies = [SimpleNamespace(as_string=lambda: "http://pub:1")]
+
+    monkeypatch.setattr(ytb, "ProxyInterface", _PI)
+    monkeypatch.setattr(ytb, "choice", lambda seq: seq[0])
+
+    async def _fake_grab(*_a, **kw):
+        captured["pool"] = kw.get("proxy_pool")
+        return ("ok", "x", "t")
+
+    monkeypatch.setattr(ytb, "grab", _fake_grab)
+
+    _PI.called = False
+    run_cli(tmp_path, "dummy", "-p", "http://cli", "--public-proxy", "-n", "1")
+
+    assert _PI.called
+    assert captured["pool"] == ["http://cli", "http://pub:1"]
+
+
+@pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
+def test_public_proxy_https(monkeypatch, tmp_path: Path):
+    called: dict[str, Any] = {}
+
+    class _PI:
+        def __init__(self, *a, **k):
+            called.update(k)
+            self.proxies = [SimpleNamespace(as_string=lambda: "https://pub:1")]
+
+    monkeypatch.setattr(ytb, "ProxyInterface", _PI)
+
+    async def _fake_grab(*_a, **kw):
+        return ("ok", "x", "t")
+
+    monkeypatch.setattr(ytb, "grab", _fake_grab)
+
+    run_cli(
+        tmp_path,
+        "dummy",
+        "--public-proxy",
+        "2",
+        "--public-proxy-type",
+        "https",
+        "-n",
+        "1",
+    )
+
+    assert called["protocol"] == "https"
+    assert called["maxProxies"] == 2
+
+
+@pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
+def test_public_proxy_socks(monkeypatch, tmp_path: Path):
+    called = {}
+
+    class FakeResponse:
+        status_code = 200
+        text = "1.1.1.1:1080\n2.2.2.2:1080"
+
+        def raise_for_status(self):
+            pass
+
+    monkeypatch.setattr(ytb.requests, "get", lambda *a, **k: FakeResponse())
+
+    async def _fake_grab(*_a, **kw):
+        called["pool"] = kw.get("proxy_pool")
+        called["cfg"] = kw.get("proxy_cfg")
+        return ("ok", "x", "t")
+
+    monkeypatch.setattr(ytb, "grab", _fake_grab)
+
+    run_cli(
+        tmp_path,
+        "dummy",
+        "--public-proxy",
+        "1",
+        "--public-proxy-type",
+        "socks",
+        "-n",
+        "1",
+    )
+
+    cfg = called["cfg"]
+    assert isinstance(cfg, ytb.GenericProxyConfig)
+    assert cfg.http_url == "socks5://1.1.1.1:1080"
+
+
+@pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
+def test_public_proxy_no_swiftshadow(monkeypatch, tmp_path: Path):
+    class FakeResp:
+        status_code = 200
+        text = "1.2.3.4:1080"
+
+        def raise_for_status(self):
+            pass
+
+    monkeypatch.setattr(ytb, "ProxyInterface", None)
+    monkeypatch.setattr(ytb.requests, "get", lambda *a, **k: FakeResp())
+
+    captured = {}
+
+    async def _fake_grab(*_a, **kw):
+        captured["cfg"] = kw.get("proxy_cfg")
+        return ("ok", "x", "t")
+
+    monkeypatch.setattr(ytb, "grab", _fake_grab)
+
+    run_cli(tmp_path, "dummy", "--public-proxy", "1", "-n", "1")
+
+    cfg = captured["cfg"]
+    assert isinstance(cfg, ytb.GenericProxyConfig)
+    assert cfg.http_url.startswith("socks5://")
