@@ -62,12 +62,6 @@ from .formatters import TimeStampedText, FMT, EXT
 from .converter import convert_existing
 try:
     from swiftshadow.classes import ProxyInterface
-    # Prevent Swiftshadow from writing directly to stdout so it doesn't
-    # corrupt the Rich progress bar. Instead, propagate to our root logger.
-    _slog = logging.getLogger("swiftshadow")
-    _slog.handlers.clear()
-    _slog.propagate = True
-    _slog.setLevel(logging.DEBUG)
 except Exception:  # pragma: no cover - optional dep
     ProxyInterface = None  # type: ignore
 # ------------------------------------------------------------
@@ -684,7 +678,6 @@ async def _main() -> None:
     logging.basicConfig(
         level=root_logger_level,
         handlers=[console_handler] + ([file_handler] if file_handler else []),
-        force=True,
     )
 
     # ---------- runtime tweaks ----------------------------------------
@@ -741,14 +734,11 @@ async def _main() -> None:
                 logging.error("Swiftshadow not installed")
             else:
                 try:
-                    mgr = await asyncio.to_thread(
-                        ProxyInterface,
+                    mgr = ProxyInterface(
                         countries=countries,
                         protocol=args.public_proxy_type,
                         maxProxies=args.public_proxy,
-                        autoUpdate=False,
                     )
-                    await mgr.async_update()
                     public = [p.as_string() for p in mgr.proxies]
                     proxies.extend(public)
                     logging.info(
@@ -940,8 +930,11 @@ async def _main() -> None:
             f"(total {len(ok)+len(none)+len(fail)})"
         )
         if banned_proxies:
-            logging.info("Banned proxies: %s", ", ".join(sorted(banned_proxies)))
-            print(f"Banned proxies: {', '.join(sorted(banned_proxies))}")
+            formatted = "\n".join(f"  • {p}" for p in sorted(banned_proxies))
+            logging.info("Banned proxies:\n%s", formatted)
+            print("Banned proxies:")
+            for p in sorted(banned_proxies):
+                print(f"  • {p}")
         sys.stdout.flush()
 
     # --------------- concatenation / splitting ------------------------
