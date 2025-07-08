@@ -87,7 +87,8 @@ python -m yt_bulk_cc.yt_bulk_cc --convert ./out -f srt -o ./out_srt
 | `-t`, `--timestamps`         |                 | Adds `[hh:mm:ss.mmm]` timestamps to `text` format.                                                                               |
 | `--no-seq-prefix`            |                 | Disables the `00001-` numeric prefix on filenames.                                                                               |
 | `--stats`<br>`--no-stats`    |                 | Toggles the inclusion of statistics headers in output files. (Default: on)                                                       |
-| `-C`, `--concat`             | _[basename]_    | Concatenate all results into a single file with an optional basename.                                                            |
+| `-C`, `--concat`             |                 | Concatenate all results into a single file. |
+| `--basename`                 | _(name)_        | Base filename for concatenated output. Default: `combined`. |
 | `--split`                    | _(e.g. 10000c)_ | With `--concat`, splits the output into new files when a size threshold is met.<br>Units: `w` (words), `l` (lines), `c` (chars). |
 | `--stats-top`                | _N_             | Limit file statistics in the final summary to the top N entries. |
 | **Network & Authentication** |                 |                                                                                                                                  |

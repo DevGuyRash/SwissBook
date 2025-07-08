@@ -151,6 +151,7 @@ def test_concat_with_split(tmp_path: Path, unit):
         "-f",
         "text",
         "-C",
+        "--basename",
         "bundle",
         "--split",
         f"1{unit}",
@@ -174,6 +175,7 @@ def test_text_concat_unique_videos(tmp_path: Path):
         "-f",
         "text",
         "-C",
+        "--basename",
         "bundle",
         "-n",
         "3",
@@ -195,6 +197,7 @@ def test_json_concat_contains_meta_and_stats(tmp_path: Path):
         "-f",
         "json",
         "-C",
+        "--basename",
         "combo",
         "-n",
         "3",
@@ -216,6 +219,7 @@ def test_json_concat_unique_videos(tmp_path: Path):
         "-f",
         "json",
         "-C",
+        "--basename",
         "combo",
         "-n",
         "3",
@@ -255,7 +259,7 @@ def test_convert_concat_json(tmp_path: Path, dest_fmt):
         tmp_path,
         "dummy",                # URL ignored by patched detect()
         "-f", "json",
-        "-C", "combo",
+        "-C", "--basename", "combo",
         "-n", "3",
     )
     combo = tmp_path / "combo.json"
@@ -359,6 +363,7 @@ def test_json_concat_no_stats_key(tmp_path: Path):
         "-f",
         "json",
         "-C",
+        "--basename",
         "combo",
         "-n",
         "3",
@@ -508,6 +513,7 @@ def test_concat_order(tmp_path: Path, monkeypatch):
         "-f",
         "text",
         "-C",
+        "--basename",
         "bundle",
         "--split",
         "30w",          # tiny threshold → multiple files for 5 videos
@@ -526,7 +532,7 @@ def test_concat_order(tmp_path: Path, monkeypatch):
 # ───────────────────────── file stats test ────────────────────── #
 @pytest.mark.usefixtures("patch_transcript", "patch_scrapetube", "patch_detect")
 def test_json_stats_are_accurate(tmp_path: Path):
-    run_cli(tmp_path, "dummy", "-f", "json", "-C", "combo", "-n", "3")
+    run_cli(tmp_path, "dummy", "-f", "json", "-C", "--basename", "combo", "-n", "3")
     jfile = tmp_path / "combo.json"
     data  = json.loads(jfile.read_text())
     w,l,c = ytb._stats(jfile.read_text())
@@ -551,6 +557,7 @@ def test_split_limit_respected(tmp_path: Path, fmt: str, unit: str, limit: int):
         "-f",
         fmt,
         "-C",
+        "--basename",
         "bundle",
         "--split",
         f"{limit}{unit}",
@@ -587,7 +594,7 @@ def test_stats_block_no_duplicates(tmp_path, patch_transcript,
 @pytest.mark.parametrize("dest_fmt", ["srt", "text"])
 def test_convert_includes_headers(tmp_path, patch_transcript, patch_scrapetube,
                                   patch_detect, dest_fmt):
-    run_cli(tmp_path, "dummy", "-f", "json", "-C", "combo", "-n", "2")
+    run_cli(tmp_path, "dummy", "-f", "json", "-C", "--basename", "combo", "-n", "2")
     combo = tmp_path / "combo.json"
     run_cli(tmp_path, "--convert", str(combo), "-f", dest_fmt)
     out = combo.with_suffix(f".{ytb.EXT[dest_fmt]}")
@@ -596,7 +603,7 @@ def test_convert_includes_headers(tmp_path, patch_transcript, patch_scrapetube,
 
 def test_convert_video_separators(tmp_path, patch_transcript, patch_scrapetube,
                                   patch_detect):
-    run_cli(tmp_path, "dummy", "-f", "json", "-C", "combo", "-n", "2")
+    run_cli(tmp_path, "dummy", "-f", "json", "-C", "--basename", "combo", "-n", "2")
     combo = tmp_path / "combo.json"
     run_cli(tmp_path, "--convert", str(combo), "-f", "text")
     out = combo.with_suffix(".txt").read_text()
@@ -676,7 +683,7 @@ def test_stats_top_cap_and_all(tmp_path: Path, capsys):
 # ---------------------------------------------------------------------------
 @pytest.mark.usefixtures("patch_transcript", "patch_scrapetube", "patch_detect")
 def test_item_stats_inside_concat_json(tmp_path: Path):
-    run_cli(tmp_path, "dummy", "-f", "json", "-C", "combo", "-n", "3")
+    run_cli(tmp_path, "dummy", "-f", "json", "-C", "--basename", "combo", "-n", "3")
     data = json.loads((tmp_path / "combo.json").read_text())
 
     for item in data["items"]:
@@ -726,6 +733,7 @@ def test_json_split_char_limit_respected(tmp_path: Path):
         "-f",
         "json",
         "-C",
+        "--basename",
         "combo",
         "--split",
         "5000c",
