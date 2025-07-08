@@ -67,6 +67,7 @@ try:
     _slog = logging.getLogger("swiftshadow")
     _slog.handlers.clear()
     _slog.propagate = True
+    _slog.setLevel(logging.DEBUG)
 except Exception:  # pragma: no cover - optional dep
     ProxyInterface = None  # type: ignore
 # ------------------------------------------------------------
@@ -683,6 +684,7 @@ async def _main() -> None:
     logging.basicConfig(
         level=root_logger_level,
         handlers=[console_handler] + ([file_handler] if file_handler else []),
+        force=True,
     )
 
     # ---------- runtime tweaks ----------------------------------------
@@ -743,9 +745,7 @@ async def _main() -> None:
                         countries=countries,
                         protocol=args.public_proxy_type,
                         maxProxies=args.public_proxy,
-                        autoUpdate=False,
                     )
-                    await mgr.async_update()
                     public = [p.as_string() for p in mgr.proxies]
                     proxies.extend(public)
                     logging.info(
