@@ -59,6 +59,21 @@ def grab(
     proxy_file: Optional[pathlib.Path] = Opt(
         None, "--proxy-file", help="Provide a file with one proxy per line to rotate through."
     ),
+    public_proxy: Optional[int] = Opt(
+        None,
+        "--public-proxy",
+        help="Fetch N free proxies via Swiftshadow or a SOCKS list",
+    ),
+    public_proxy_country: Optional[str] = Opt(
+        None,
+        "--public-proxy-country",
+        help="Comma-separated country codes for public proxies",
+    ),
+    public_proxy_type: Optional[str] = Opt(
+        None,
+        "--public-proxy-type",
+        help="Protocol for public proxies (http|https|socks)",
+    ),
     headers: Optional[str] = Opt(None, "--headers", help='Custom HTTP headers as a JSON string. Example: \'{"X-API-Key":"123"}\''),
     dark_mode: bool = Opt(False, "--dark-mode", help="Request the page in dark mode (prefers-color-scheme: dark)."),
     # --- NEW - UA filters -------------------------------------------------- #
@@ -177,11 +192,22 @@ def grab(
         if _raw_css
         else None
     )
+
+    public_proxy       = _unwrap(public_proxy)
+    public_proxy_country = _unwrap(public_proxy_country)
+    public_proxy_type  = _unwrap(public_proxy_type)
     
     # ---------- proxy pool initialisation -------------------------------- #
     from site_downloader.proxy import pool as proxy_pool
 
-    _proxy_cycle = proxy_pool(proxy, proxies, proxy_file)
+    _proxy_cycle = proxy_pool(
+        proxy,
+        proxies,
+        proxy_file,
+        public_proxy=public_proxy,
+        public_proxy_country=public_proxy_country,
+        public_proxy_type=public_proxy_type,
+    )
 
     # ---------- cookie handling ------------------------------------------ #
     from site_downloader import session as _sess
@@ -217,7 +243,28 @@ def grab(
         from site_downloader.cli import batch as _batch_cmd
 
         # call directly to avoid a sub-process
-        _batch_cmd(local_src, fmt=fmt, jobs=jobs)
+        _batch_cmd(
+            local_src,
+            fmt=fmt,
+            jobs=jobs,
+            engine=engine,
+            proxy=proxy,
+            proxies=proxies,
+            proxy_file=proxy_file,
+            headers=headers,
+            dark_mode=dark_mode,
+            viewport_width=viewport_width,
+            quality=quality,
+            ua_browser=ua_browser,
+            ua_os=ua_os,
+            cookies_json=cookies_json,
+            cookies_file=cookies_file,
+            extra_css=extra_css,
+            block=block,
+            public_proxy=public_proxy,
+            public_proxy_country=public_proxy_country,
+            public_proxy_type=public_proxy_type,
+        )
         return
 
 
@@ -328,6 +375,21 @@ def batch(
     proxy_file: Optional[pathlib.Path] = Opt(
         None, "--proxy-file", help="File containing proxies (1/line)"
     ),
+    public_proxy: Optional[int] = Opt(
+        None,
+        "--public-proxy",
+        help="Fetch N free proxies via Swiftshadow or a SOCKS list",
+    ),
+    public_proxy_country: Optional[str] = Opt(
+        None,
+        "--public-proxy-country",
+        help="Comma-separated country codes for public proxies",
+    ),
+    public_proxy_type: Optional[str] = Opt(
+        None,
+        "--public-proxy-type",
+        help="Protocol for public proxies (http|https|socks)",
+    ),
     headers: Optional[str] = Opt(None, "--headers", help="Extra HTTP headers as JSON string"),
     dark_mode: bool = Opt(False, "--dark-mode", help="prefers-color-scheme: dark"),
     viewport_width: int = Opt(DEFAULT_VIEWPORT, "--viewport-width", help="Browser viewport width in pixels."),
@@ -397,7 +459,14 @@ def batch(
                             return v.default if isinstance(v, OptionInfo) else v
 
                         from site_downloader.proxy import pool as proxy_pool
-                        _proxy_cycle = proxy_pool(_plain(proxy), _plain(proxies), _plain(proxy_file))
+                        _proxy_cycle = proxy_pool(
+                            _plain(proxy),
+                            _plain(proxies),
+                            _plain(proxy_file),
+                            public_proxy=_plain(public_proxy),
+                            public_proxy_country=_plain(public_proxy_country),
+                            public_proxy_type=_plain(public_proxy_type),
+                        )
 
                         from site_downloader import session as _sess
                         jar: list[dict] | None = None
@@ -435,6 +504,9 @@ def batch(
                                 cookies_file=_plain(cookies_file),
                                 extra_css=_extra_css_list,
                                 block=_block_list,
+                                public_proxy=_plain(public_proxy),
+                                public_proxy_country=_plain(public_proxy_country),
+                                public_proxy_type=_plain(public_proxy_type),
                             )
                         )
 
