@@ -39,7 +39,7 @@ source .venv/bin/activate
 
 The script is invoked via `python -m yt_bulk_cc.yt_bulk_cc`.
 
-#### Quick Examples
+### Quick Examples
 
 ```bash
 # 1. Download a single video's transcript as an SRT file
@@ -62,6 +62,7 @@ To combine these downloaded files, you can run the same command with the `--conc
 # 4. Concatenate the transcripts from the previous step
 python -m yt_bulk_cc.yt_bulk_cc "https://www.youtube.com/@Recipe4Porkchops" --concat
 ```
+
 ![Example Concatenation Run](assets/yt_bulk_cc-example_02.png)
 
 ```bash
@@ -72,52 +73,54 @@ python -m yt_bulk_cc.yt_bulk_cc "https://www.youtube.com/@CrashCourse" -f text -
 python -m yt_bulk_cc.yt_bulk_cc --convert ./out -f srt -o ./out_srt
 ```
 
-#### Command-Line Options
+### Command-Line Options
 
-| Option                       | Argument        | Description                                                                                                                      |
-| :--------------------------- | :-------------- | :------------------------------------------------------------------------------------------------------------------------------- |
-| **Core Options**             |                 |                                                                                                                                  |
-| `LINK`                       | _(url)_         | The positional argument for the video, playlist, or channel URL.                                                                 |
-| `-o`, `--folder`             | _(path)_        | Destination directory for output files. Default: `.`                                                                             |
-| `-l`, `--language`           | _(code)_        | Preferred language code (e.g., `en`, `es`). Can be repeated for fallback priority.                                               |
-| `-f`, `--format`             | _(name)_        | Output format: `json`, `srt`, `webvtt`, `text`, `pretty`. Default: `json`.                                                       |
-| `-n`, `--limit`              | _(int)_         | Stop after processing N videos from a playlist or channel.                                                                       |
-| `-j`, `--jobs`               | _(int)_         | Number of concurrent transcript downloads. Default: `1`.                                                                         |
-| **Output & Formatting**      |                 |                                                                                                                                  |
-| `-t`, `--timestamps`         |                 | Adds `[hh:mm:ss.mmm]` timestamps to `text` format.                                                                               |
-| `--no-seq-prefix`            |                 | Disables the `00001-` numeric prefix on filenames.                                                                               |
-| `--stats`<br>`--no-stats`    |                 | Toggles the inclusion of statistics headers in output files. (Default: on)                                                       |
-| `-C`, `--concat`             |                 | Concatenate all results into a single file. |
-| `--basename`                 | _(name)_        | Base filename for concatenated output. Default: `combined`. |
-| `--split`                    | _(e.g. 10000c)_ | With `--concat`, splits the output into new files when a size threshold is met.<br>Units: `w` (words), `l` (lines), `c` (chars). |
-| `--stats-top`                | _N_             | Limit file statistics in the final summary to the top N entries. |
-| **Network & Authentication** |                 |                                                                                                                                  |
-| `-p`, `--proxy`              | _(url)_         | Single proxy URL or comma-separated list to rotate through. Use `ws://user:pass` for Webshare. |
-| `--proxy-file`              | _(file)_        | Load additional proxies from a file (one URL per line). |
-| `--public-proxy [N]`        |                 | Fetch N free proxies (default 5) using Swiftshadow or a SOCKS list. |
-| `--public-proxy-country`    | _(CC[,CC])_     | Restrict public proxies to these country codes. |
-| `--public-proxy-type`       | _(http\|https\|socks)_ | Protocol for public proxies. Auto-selected if omitted. |
-| `-c`, `--cookie-json`, `--cookie-file`        | _(file)_        | Cookies JSON exported with a browser extension (see below). |
-| `-s`, `--sleep`              | _(float)_       | Seconds to wait between playlist requests and after each transcript. Default: `2`. |
-| `--check-ip`                |                 | Preflight transcript fetch to detect IP bans before downloading. |
-| **Utilities**                |                 |                                                                                                                                  |
-| `--convert`                  | _(path)_        | Converts existing JSON transcripts from a file or directory to the specified `-f` format.                                        |
-| `--overwrite`                |                 | Re-download and overwrite files even if they already exist.                                                                      |
-| `-v`, `--verbose`            |                 | Increase console log verbosity (`-v` for INFO, `-vv` for DEBUG).                                                                 |
-| `-L`, `--log-file`           | _(file)_        | Write a detailed run log to a specific file.                                                                                     |
-| `--no-log`                   |                 | Disable file logging entirely.                                                                                                   |
-| `-F`, `--formats-help`       |                 | Show examples of each output format and exit. |
+| Option                                 | Argument               | Description                                                                                                                      |
+| :------------------------------------- | :--------------------- | :------------------------------------------------------------------------------------------------------------------------------- |
+| **Core Options**                       |                        |                                                                                                                                  |
+| `LINK`                                 | _(url)_                | The positional argument for the video, playlist, or channel URL.                                                                 |
+| `-o`, `--folder`                       | _(path)_               | Destination directory for output files. Default: `.`                                                                             |
+| `-l`, `--language`                     | _(code)_               | Preferred language code (e.g., `en`, `es`). Can be repeated for fallback priority.                                               |
+| `-f`, `--format`                       | _(name)_               | Output format: `json`, `srt`, `webvtt`, `text`, `pretty`. Default: `json`.                                                       |
+| `-n`, `--limit`                        | _(int)_                | Stop after processing N videos from a playlist or channel.                                                                       |
+| `-j`, `--jobs`                         | _(int)_                | Number of concurrent transcript downloads. Default: `1`.                                                                         |
+| **Output & Formatting**                |                        |                                                                                                                                  |
+| `-t`, `--timestamps`                   |                        | Adds `[hh:mm:ss.mmm]` timestamps to `text` format.                                                                               |
+| `--no-seq-prefix`                      |                        | Disables the `00001-` numeric prefix on filenames.                                                                               |
+| `--stats`<br>`--no-stats`              |                        | Toggles the inclusion of statistics headers in output files. (Default: on)                                                       |
+| `-C`, `--concat`                       |                        | Concatenate all results into a single file.                                                                                      |
+| `--basename`                           | _(name)_               | Base filename for concatenated output. Default: `combined`.                                                                      |
+| `--split`                              | _(e.g. 10000c)_        | With `--concat`, splits the output into new files when a size threshold is met.<br>Units: `w` (words), `l` (lines), `c` (chars). |
+| `--stats-top`                          | _N_                    | Limit file statistics in the final summary to the top N entries.                                                                 |
+| **Network & Authentication**           |                        |                                                                                                                                  |
+| `-p`, `--proxy`                        | _(url)_                | Single proxy URL or comma-separated list to rotate through. Use `ws://user:pass` for Webshare.                                   |
+| `--proxy-file`                         | _(file)_               | Load additional proxies from a file (one URL per line).                                                                          |
+| `--public-proxy [N]`                   |                        | Fetch N free proxies (default 5) using Swiftshadow or a SOCKS list.                                                              |
+| `--public-proxy-country`               | _(CC[,CC])_            | Restrict public proxies to these country codes.                                                                                  |
+| `--public-proxy-type`                  | _(http\|https\|socks)_ | Protocol for public proxies. Auto-selected if omitted.                                                                           |
+| `-c`, `--cookie-json`, `--cookie-file` | _(file)_               | Cookies JSON exported with a browser extension (see below).                                                                      |
+| `-s`, `--sleep`                        | _(float)_              | Seconds to wait between playlist requests and after each transcript. Default: `2`.                                               |
+| `--check-ip`                           |                        | Preflight transcript fetch to detect IP bans before downloading.                                                                 |
+| **Utilities**                          |                        |                                                                                                                                  |
+| `--convert`                            | _(path)_               | Converts existing JSON transcripts from a file or directory to the specified `-f` format.                                        |
+| `--overwrite`                          |                        | Re-download and overwrite files even if they already exist.                                                                      |
+| `-v`, `--verbose`                      |                        | Increase console log verbosity (`-v` for INFO, `-vv` for DEBUG).                                                                 |
+| `-L`, `--log-file`                     | _(file)_               | Write a detailed run log to a specific file.                                                                                     |
+| `--no-log`                             |                        | Disable file logging entirely.                                                                                                   |
+| `-F`, `--formats-help`                 |                        | Show examples of each output format and exit.                                                                                    |
+
 ### Proxy usage
 
 Use `-p`/`--proxy` and `--proxy-file` to provide a single proxy or a rotation list. Each URL may include credentials, for example `http://user:pass@host:port`. To use Webshare residential proxies pass `ws://USER:PASS` as the proxy URL. With `--public-proxy` the tool fetches a small pool of free proxies; you can pass a number as `--public-proxy N` or `--public-proxy=N` (default 5). Use `--public-proxy-country` and `--public-proxy-type` to refine the pool. User-supplied proxies always take precedence, with public ones used as a fallback. At startup the tool logs how many proxies came from the CLI and how many were loaded from a file. With `-v` you'll see which proxy is used for each request and when one gets banned. The logfile (created automatically unless `--no-log` is used) always records the full `-vv` debug output, so detailed retry information is preserved even if the console is less verbose.
 
-
 ### Exporting cookies
 
 Use a browser extension like **Get cookies.txt** for Chrome or Firefox:
+
 1. Log into YouTube in your browser.
 2. Choose **Export as JSON** for `youtube.com` in the extension menu.
 3. Save the file (e.g. `cookies.json`) and pass it with `-c cookies.json`.
+
 ---
 
 ## License
