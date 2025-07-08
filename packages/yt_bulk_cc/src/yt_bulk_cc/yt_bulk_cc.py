@@ -60,6 +60,10 @@ from .utils import (
 )
 from .formatters import TimeStampedText, FMT, EXT
 from .converter import convert_existing
+try:
+    from swiftshadow.classes import ProxyInterface
+except Exception:  # pragma: no cover - optional dep
+    ProxyInterface = None  # type: ignore
 # ------------------------------------------------------------
 #  Robust error-class import — works on every library version
 # ------------------------------------------------------------
@@ -454,6 +458,24 @@ async def _main() -> None:
             "Each line may include credentials. Combines with -p when rotating between multiple"
         ),
     )
+    P.add_argument(
+        "--public-proxy",
+        nargs="?",
+        const=5,
+        type=int,
+        metavar="N",
+        help="Fetch N free proxies via Swiftshadow (default 5)",
+    )
+    P.add_argument(
+        "--public-proxy-country",
+        metavar="CC[,CC]",
+        help="Comma-separated country codes for public proxies",
+    )
+    P.add_argument(
+        "--public-proxy-type",
+        choices=["http", "https", "socks"],
+        help="Protocol for public proxies (auto if omitted)",
+    )
     P.add_argument("-c", "--cookie-json", "--cookie-file", dest="cookie_json",
                    metavar="FILE",
                    help="Cookies JSON exported by browser (see docs)")
@@ -464,9 +486,9 @@ async def _main() -> None:
 
     # concatenation & splitting
     P.add_argument("-C", "--concat", action="store_true",
-                   help="Write all successful transcripts into one file.")
+                   help="Write all successful transcripts into one file")
     P.add_argument("--basename", default="combined", metavar="NAME",
-                   help="Basename for concatenated file (requires -C).")
+                   help="Base filename for concatenated output (default 'combined')")
     P.add_argument("--split", metavar="N[w|c|l]",
                    help="With --concat: start a new file once N words/chars/lines "
                         "would be exceeded, e.g. --split 12000c. Off by default.")
@@ -481,6 +503,23 @@ async def _main() -> None:
                    help="Convert existing JSON transcripts to -f format then exit")
 
     args = P.parse_args()
+
+    if args.public_proxy is not None:
+        if args.public_proxy_type is None:
+            if ProxyInterface is None:
+                args.public_proxy_type = "socks"
+                logging.info("Swiftshadow not installed; using SOCKS proxies")
+            else:
+                args.public_proxy_type = choice(["http", "https"])
+                logging.info(
+                    "Auto-selected %s public proxies",
+                    args.public_proxy_type.upper(),
+                )
+        elif args.public_proxy_type in ("http", "https") and ProxyInterface is None:
+            logging.warning(
+                "Swiftshadow not installed; falling back to SOCKS proxies"
+            )
+            args.public_proxy_type = "socks"
 
     # ---------- optional format samples -------------------------------
     if args.formats_help:
@@ -672,12 +711,51 @@ async def _main() -> None:
         except Exception as e:
             logging.error("Cannot read proxy file %s (%s)", args.proxy_file, e)
             sys.exit(1)
-    if cli_proxies or file_proxies:
+    if args.public_proxy is not None:
+        countries: list[str] = []
+        if args.public_proxy_country:
+            countries = [c.strip().upper() for c in args.public_proxy_country.split(',') if c.strip()]
+        public: list[str] = []
+        if args.public_proxy_type == "socks":
+            try:
+                resp = requests.get(
+                    "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks5.txt",
+                    timeout=10,
+                )
+                resp.raise_for_status()
+                lines = [line.strip() for line in resp.text.splitlines() if line.strip()]
+                public = [f"socks5://{line}" for line in lines[: args.public_proxy]]
+                proxies.extend(public)
+                logging.info("Loaded %d public SOCKS proxies", len(public))
+            except Exception as e:
+                logging.error("Failed to fetch SOCKS proxies: %s", e)
+        else:
+            if ProxyInterface is None:
+                logging.error("Swiftshadow not installed")
+            else:
+                try:
+                    mgr = ProxyInterface(
+                        countries=countries,
+                        protocol=args.public_proxy_type,
+                        maxProxies=args.public_proxy,
+                    )
+                    public = [p.as_string() for p in mgr.proxies]
+                    proxies.extend(public)
+                    logging.info(
+                        "Loaded %d public %s proxies via Swiftshadow",
+                        len(public),
+                        args.public_proxy_type.upper(),
+                    )
+                except Exception as e:
+                    logging.error("Swiftshadow failed: %s", e)
+    public_count = len(public) if args.public_proxy is not None else 0
+    if cli_proxies or file_proxies or public_count:
         logging.info(
-            "Loaded %d proxies (CLI %d, file %d)",
-            len(cli_proxies) + len(file_proxies),
+            "Loaded %d proxies (CLI %d, file %d, public %d)",
+            len(cli_proxies) + len(file_proxies) + public_count,
             len(cli_proxies),
             len(file_proxies),
+            public_count,
         )
 
     proxy_cfg = None
