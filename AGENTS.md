@@ -38,6 +38,13 @@ This is the most important instruction. For **every response you generate**, you
 2. **Subtask Execution**: Execute each subtask from the overall plan using the mandatory `State -> Reasoning -> Plan -> Plan Critique -> Action -> Verify` cycle.
 3. **Completion**: Once all subtasks are complete and verified, provide a final summary.
 
+## Context Directory
+
+The `context/` directory contains reference materials and documentation that provide important context for your operations`. These files are meant to be read and referenced by the agent as needed.
+
+- `SwiftShadow.pdf`: Documentation for the SwiftShadow proxy service API, a lightweight and efficient Python library designed to simplify IP proxy rotation for web scraping, data mining, and other automated tasks. It helps bypass common challenges like IP bans, rate limits, and detection mechanisms, ensuring smooth and uninterrupted data collection.
+- `youtube-transcript-api.md`: Documentation for the YouTube Transcript API, a Python library for retrieving YouTube video transcripts and captions.
+
 ## Governing Protocols
 
 The following sections are not optional reading; they are the source of truth for your `Reasoning` and `Plan`. You MUST adhere to them.
