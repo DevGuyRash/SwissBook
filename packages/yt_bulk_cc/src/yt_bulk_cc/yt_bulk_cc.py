@@ -746,7 +746,9 @@ async def _main() -> None:
                         countries=countries,
                         protocol=args.public_proxy_type,
                         maxProxies=args.public_proxy,
+                        autoUpdate=False,
                     )
+                    await mgr.async_update()
                     public = [p.as_string() for p in mgr.proxies]
                     proxies.extend(public)
                     logging.info(
