@@ -604,6 +604,7 @@ async def _main() -> None:
             ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
             log_file = Path(args.folder).expanduser() / f"yt_bulk_cc_{ts}.log"
 
+    _restore_streams = None
     if log_file:
         import atexit
         log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -611,43 +612,37 @@ async def _main() -> None:
         # ─────────────── console/file tee with ANSI-strip ───────────────
         _ANSI_RE = re.compile(r"\x1B\[[0-9;]*[A-Za-z]")
 
-        class _Tee:
-            """
-            Duplicate every write/flush to both the real console stream
-            *and* the log file, but scrub ANSI escape sequences from the
-            file copy so the log remains plain-text.
-            """
+        file_handler = logging.FileHandler(log_file, encoding="utf-8", mode="w")
 
-            def __init__(self, console_stream, file_stream):
+        class _Tee:
+            """Duplicate writes to both console and log file."""
+
+            def __init__(self, console_stream):
                 self._console = console_stream
-                self._file    = file_stream
+                self._file    = file_handler.stream
 
             def write(self, data):
-                self._console.write(data)               # honour current capture
-                self._file.write(_ANSI_RE.sub("", data))  # strip colours
+                self._console.write(data)
+                self._file.write(_ANSI_RE.sub("", data))
+                if "\n" in data:
+                    self._file.flush()
 
             def flush(self):
                 self._console.flush()
                 self._file.flush()
 
-        fh = log_file.open("w", encoding="utf-8")
-
         # Keep originals so we can put them back at shutdown.
-        _orig_out, _orig_err = sys.stdout, sys.stderr   # may be a capture proxy
+        _orig_out, _orig_err = sys.stdout, sys.stderr
 
-        sys.stdout = _Tee(_orig_out, fh)
-        sys.stderr = _Tee(_orig_err, fh)
+        sys.stdout = _Tee(_orig_out)
+        sys.stderr = _Tee(_orig_err)
 
         def _restore_streams():
-            """
-            Undo the tee so the interpreter's final flush doesn't hit
-            a closed file, then close the log.
-            """
             sys.stdout, sys.stderr = _orig_out, _orig_err
-            fh.close()
+            file_handler.close()
 
         atexit.register(_restore_streams)
-        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        _restore_streams_func = _restore_streams
 
         # Timestamped format for the plain-text log.
         LOG_FMT_FILE = "%(asctime)s - %(levelname)s - %(message)s"
@@ -655,6 +650,7 @@ async def _main() -> None:
         file_handler.setFormatter(logging.Formatter(LOG_FMT_FILE, DATE_FMT))
     else:
         file_handler = None
+        _restore_streams_func = None
 
     # ────────────── console vs. file log verbosity ──────────────
     console_level = [logging.WARNING, logging.INFO, logging.DEBUG][min(args.verbose, 2)]
@@ -814,14 +810,24 @@ async def _main() -> None:
 
     if args.check_ip:
         from .core import probe_video
+        from rich.progress import Progress, SpinnerColumn, TextColumn
+
         first_vid = videos[0]["videoId"]
-        ok_probe, banned_proxies = probe_video(
-            first_vid,
-            cookies=cookies_data,
-            proxy_pool=proxy_pool,
-            proxy_cfg=proxy_cfg,
-            banned=banned_proxies,
-        )
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("{task.description}"),
+            console=term_console,
+        ) as bar:
+            tid = bar.add_task("Checking IP", total=None)
+            ok_probe, banned_proxies = await asyncio.to_thread(
+                probe_video,
+                first_vid,
+                cookies=cookies_data,
+                proxy_pool=proxy_pool,
+                proxy_cfg=proxy_cfg,
+                banned=banned_proxies,
+            )
+            bar.remove_task(tid)
         if not ok_probe:
             logging.error("IP appears blocked; aborting")
             for v in videos:
@@ -1206,6 +1212,9 @@ async def _main() -> None:
         h.flush()
     logging.shutdown()
 
+    if _restore_streams_func:
+        _restore_streams_func()
+
     # if anything genuinely failed, propagate non-zero exit for CI
     if fail:
         sys.exit(2)
@@ -1223,7 +1232,7 @@ async def main() -> None:
     except KeyboardInterrupt:
         logging.warning("Interrupted by user")
         print(f"\n{C.BLU}Aborted by user{C.END}")
-        sys.exit(130)
+        os._exit(130)
 
 
 def cli_entry():
@@ -1241,7 +1250,7 @@ def cli_entry():
         # The `main` function has its own handler, but this is a fallback
         # for interrupts that occur before the event loop is running.
         print(f"\n{C.BLU}Aborted by user{C.END}")
-        sys.exit(130)
+        os._exit(130)
 
 
 # ────────────────────────── bootstrap ────────────────────────────────
