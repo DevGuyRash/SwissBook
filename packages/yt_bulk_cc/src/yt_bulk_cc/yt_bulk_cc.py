@@ -60,10 +60,12 @@ from .utils import (
 )
 from .formatters import TimeStampedText, FMT, EXT
 from .converter import convert_existing
-try:
-    from swiftshadow.classes import ProxyInterface
-except Exception:  # pragma: no cover - optional dep
-    ProxyInterface = None  # type: ignore
+
+# ---------------------------------------------------------------------------
+# Optional Swiftshadow integration.  Import lazily after logging has been
+# configured so any messages from the library are captured in our log file.
+# ---------------------------------------------------------------------------
+ProxyInterface = None  # type: ignore[assignment]
 # ------------------------------------------------------------
 #  Robust error-class import — works on every library version
 # ------------------------------------------------------------
@@ -375,6 +377,7 @@ class ColorFormatter(logging.Formatter):
 
 
 async def _main() -> None:
+    global ProxyInterface
     # custom help formatter
     class _ManFmt(argparse.ArgumentDefaultsHelpFormatter,
                   argparse.RawTextHelpFormatter):
@@ -731,14 +734,34 @@ async def _main() -> None:
                 logging.error("Failed to fetch SOCKS proxies: %s", e)
         else:
             if ProxyInterface is None:
+                try:
+                    from swiftshadow.classes import ProxyInterface as _PI
+                    ProxyInterface = _PI  # type: ignore[assignment]
+                except Exception:
+                    ProxyInterface = None  # type: ignore[assignment]
+            if ProxyInterface is None:
                 logging.error("Swiftshadow not installed")
             else:
                 try:
-                    mgr = ProxyInterface(
-                        countries=countries,
-                        protocol=args.public_proxy_type,
-                        maxProxies=args.public_proxy,
-                    )
+                    swlog = logging.getLogger("swiftshadow")
+                    swlog.handlers.clear()
+                    swlog.propagate = True
+                    swlog.setLevel(logging.DEBUG)
+
+                    import io
+                    from contextlib import redirect_stdout, redirect_stderr
+
+                    buf = io.StringIO()
+                    with redirect_stdout(buf), redirect_stderr(buf):
+                        mgr = await asyncio.to_thread(
+                            ProxyInterface,
+                            countries=countries,
+                            protocol=args.public_proxy_type,
+                            maxProxies=args.public_proxy,
+                        )
+                    txt = buf.getvalue().strip()
+                    if txt:
+                        logging.debug(txt)
                     public = [p.as_string() for p in mgr.proxies]
                     proxies.extend(public)
                     logging.info(
