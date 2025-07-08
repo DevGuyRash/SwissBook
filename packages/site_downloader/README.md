@@ -83,6 +83,9 @@ sdl batch urls.txt -f pdf -j 8
 - `--proxy http://host:port` - Use a single proxy
 - `--proxies "http://p1:port,http://p2:port"` - Rotate through multiple proxies (comma-separated)
 - `--proxy-file proxies.txt` - Load proxies from file (one per line)
+- `--public-proxy 5` - Fetch N free proxies via Swiftshadow or a SOCKS list
+- `--public-proxy-country CC,CC` - Restrict public proxies to these countries
+- `--public-proxy-type http|https|socks` - Protocol for public proxies
 - `--ua-browser chrome` - Filter user agents by browser (chrome/firefox/safari/edge)
 - `--ua-os windows` - Filter user agents by OS (windows/linux/macos/android/ios)
 - `--cookies-json '{"name":"value"}'` - Pass cookies as JSON string

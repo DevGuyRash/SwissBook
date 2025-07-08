@@ -18,6 +18,8 @@ dependencies = [
   "fake-useragent>=2.2",
   "fake-headers>=1.0",
   "aiofiles>=24.1.0",
+  "swiftshadow>=2.2",
+  "requests[socks]>=2.32.4",
 ]
 
 [tool.setuptools]

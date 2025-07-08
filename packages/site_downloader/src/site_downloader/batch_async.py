@@ -23,6 +23,9 @@ async def grab_async(
     proxy: str | None = None,
     proxies: str | None = None,
     proxy_file: pathlib.Path | None = None,
+    public_proxy: int | None = None,
+    public_proxy_country: str | None = None,
+    public_proxy_type: str | None = None,
     headers: str | None = None,
     dark_mode: bool = False,
     viewport_width: int = 1280,
@@ -49,7 +52,14 @@ async def grab_async(
     out.parent.mkdir(parents=True, exist_ok=True)
 
     # --- network identity ------------------------------------------------- #
-    _proxy_cycle = proxy_pool(proxy, proxies, proxy_file)
+    _proxy_cycle = proxy_pool(
+        proxy,
+        proxies,
+        proxy_file,
+        public_proxy=public_proxy,
+        public_proxy_country=public_proxy_country,
+        public_proxy_type=public_proxy_type,
+    )
     jar = json.loads(cookies_json) if cookies_json else None
     if cookies_file and not jar:
         from site_downloader.session import load_cookie_file
