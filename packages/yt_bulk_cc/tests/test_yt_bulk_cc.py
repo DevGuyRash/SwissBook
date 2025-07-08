@@ -853,7 +853,7 @@ def test_check_ip_bails(monkeypatch, tmp_path: Path, capsys):
     out = _strip_ansi(capsys.readouterr().out)
     assert "Summary:" in out
     assert "failed 2" in out
-    assert "banned 1" in out
+    assert "proxies banned 1" in out
 
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
@@ -1131,7 +1131,7 @@ def test_proxy_file_rotation(monkeypatch, tmp_path: Path, capsys):
     assert captured["pool"] == ["http://cli", "http://f1", "http://f2"]
     assert used[:2] == ["http://cli", "http://f1"]
     out = _strip_ansi(capsys.readouterr().out)
-    assert "banned 1" in out
+    assert "proxies banned 1" in out
 
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")

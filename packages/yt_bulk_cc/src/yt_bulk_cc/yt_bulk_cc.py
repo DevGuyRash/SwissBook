@@ -741,7 +741,8 @@ async def _main() -> None:
                 logging.error("Swiftshadow not installed")
             else:
                 try:
-                    mgr = ProxyInterface(
+                    mgr = await asyncio.to_thread(
+                        ProxyInterface,
                         countries=countries,
                         protocol=args.public_proxy_type,
                         maxProxies=args.public_proxy,
@@ -925,7 +926,7 @@ async def _main() -> None:
         sys.stdout.flush()
         # Emit the roll-up *after* the lists.
         logging.info(
-            "Summary: ✓ %s   •  ↯ no-caption %s   •  ⚠ failed %s   •  🚫 banned %s   (total %s)",
+            "Summary: ✓ %s   •  ↯ no-caption %s   •  ⚠ failed %s   •  🚫 proxies banned %s   (total %s)",
             len(ok), len(none), len(fail), len(banned_proxies), len(ok) + len(none) + len(fail),
         )
         # plain echo guarantees the final line is literally "Summary: …"
@@ -933,9 +934,12 @@ async def _main() -> None:
             f"Summary: ✓ {C.GRN}{len(ok)}{C.END}   •  "
             f"↯ no-caption {C.YEL}{len(none)}{C.END}   •  "
             f"⚠ failed {C.RED}{len(fail)}{C.END}   "
-            f"🚫 banned {C.RED}{len(banned_proxies)}{C.END}   "
+            f"🚫 proxies banned {C.RED}{len(banned_proxies)}{C.END}   "
             f"(total {len(ok)+len(none)+len(fail)})"
         )
+        if banned_proxies:
+            logging.info("Banned proxies: %s", ", ".join(sorted(banned_proxies)))
+            print(f"Banned proxies: {', '.join(sorted(banned_proxies))}")
         sys.stdout.flush()
 
     # --------------- concatenation / splitting ------------------------
