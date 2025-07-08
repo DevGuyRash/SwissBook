@@ -62,6 +62,11 @@ from .formatters import TimeStampedText, FMT, EXT
 from .converter import convert_existing
 try:
     from swiftshadow.classes import ProxyInterface
+    # Prevent Swiftshadow from writing directly to stdout so it doesn't
+    # corrupt the Rich progress bar. Instead, propagate to our root logger.
+    _slog = logging.getLogger("swiftshadow")
+    _slog.handlers.clear()
+    _slog.propagate = True
 except Exception:  # pragma: no cover - optional dep
     ProxyInterface = None  # type: ignore
 # ------------------------------------------------------------
@@ -738,7 +743,9 @@ async def _main() -> None:
                         countries=countries,
                         protocol=args.public_proxy_type,
                         maxProxies=args.public_proxy,
+                        autoUpdate=False,
                     )
+                    await mgr.async_update()
                     public = [p.as_string() for p in mgr.proxies]
                     proxies.extend(public)
                     logging.info(
