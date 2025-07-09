@@ -638,6 +638,7 @@ async def _main() -> None:
             def write(self, data):
                 self._console.write(data)               # honour current capture
                 self._file.write(_ANSI_RE.sub("", data))  # strip colours
+                self._file.flush()                      # keep log in sync
 
             def flush(self):
                 self._console.flush()
