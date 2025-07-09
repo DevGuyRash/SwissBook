@@ -41,7 +41,7 @@ from datetime import timedelta
 from pathlib import Path
 from random import choice
 import copy          # NEW
-from typing import Sequence
+from typing import Sequence, Callable
 
 import scrapetube
 from youtube_transcript_api import YouTubeTranscriptApi
@@ -62,6 +62,13 @@ from .formatters import TimeStampedText, FMT, EXT
 from .converter import convert_existing
 try:
     from swiftshadow.classes import ProxyInterface
+    # Propagate SwiftShadow logs to our root logger so they get written
+    # to the CLI log file. Clear any pre-existing handlers that might
+    # otherwise short‑circuit logging.basicConfig(force=True).
+    _slog = logging.getLogger("swiftshadow")
+    _slog.handlers.clear()
+    _slog.propagate = True
+    _slog.setLevel(logging.DEBUG)
 except Exception:  # pragma: no cover - optional dep
     ProxyInterface = None  # type: ignore
 # ------------------------------------------------------------
@@ -592,8 +599,17 @@ async def _main() -> None:
     if args.split and not args.concat:
         P.error("--split only makes sense together with --concat")
 
+    async def _update_swiftshadow(mgr: ProxyInterface) -> None:
+        """Safely refresh proxies regardless of library version."""
+        if hasattr(mgr, "async_update"):
+            await mgr.async_update()
+        elif hasattr(mgr, "update"):
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, mgr.update)
+
     # ---------- logging setup -----------------------------------------
     log_file: Path | None = None
+    _restore_streams: Callable[[], None] | None = None
     if not args.no_log:
         if args.log_file:
             log_file = Path(args.log_file).expanduser()
@@ -635,13 +651,16 @@ async def _main() -> None:
         sys.stdout = _Tee(_orig_out, fh)
         sys.stderr = _Tee(_orig_err, fh)
 
-        def _restore_streams():
+        def _restore_streams() -> None:
             """
             Undo the tee so the interpreter's final flush doesn't hit
             a closed file, then close the log.
             """
             sys.stdout, sys.stderr = _orig_out, _orig_err
             fh.close()
+
+        # expose for manual cleanup at shutdown
+        _restore_streams_fn = _restore_streams
 
         atexit.register(_restore_streams)
         file_handler = logging.FileHandler(log_file, encoding="utf-8")
@@ -650,6 +669,7 @@ async def _main() -> None:
         LOG_FMT_FILE = "%(asctime)s - %(levelname)s - %(message)s"
         DATE_FMT     = "%Y-%m-%d %H:%M:%S"
         file_handler.setFormatter(logging.Formatter(LOG_FMT_FILE, DATE_FMT))
+        _restore_streams = _restore_streams_fn
     else:
         file_handler = None
 
@@ -678,7 +698,9 @@ async def _main() -> None:
     logging.basicConfig(
         level=root_logger_level,
         handlers=[console_handler] + ([file_handler] if file_handler else []),
+        force=True,
     )
+    logging.getLogger("asyncio").setLevel(logging.WARNING)
 
     # ---------- runtime tweaks ----------------------------------------
     if args.timestamps:
@@ -740,10 +762,7 @@ async def _main() -> None:
                         maxProxies=args.public_proxy,
                         autoUpdate=False,
                     )
-                    if hasattr(mgr, "async_update"):
-                        await mgr.async_update()
-                    elif hasattr(mgr, "update"):
-                        mgr.update()
+                    await _update_swiftshadow(mgr)
                     public = [p.as_string() for p in mgr.proxies]
                     proxies.extend(public)
                     logging.info(
@@ -921,11 +940,7 @@ async def _main() -> None:
 
         # make sure everything printed so far is on disk before appending
         sys.stdout.flush()
-        # Emit the roll-up *after* the lists.
-        logging.info(
-            "Summary: ✓ %s   •  ↯ no-caption %s   •  ⚠ failed %s   •  🚫 proxies banned %s   (total %s)",
-            len(ok), len(none), len(fail), len(banned_proxies), len(ok) + len(none) + len(fail),
-        )
+        # Emit the roll-up *after* the lists (console only).
         # plain echo guarantees the final line is literally "Summary: …"
         print(
             f"Summary: ✓ {C.GRN}{len(ok)}{C.END}   •  "
@@ -1193,6 +1208,11 @@ async def _main() -> None:
     for h in logging.getLogger().handlers:
         h.flush()
     logging.shutdown()
+    if _restore_streams:
+        try:
+            _restore_streams()  # ensure no further output reaches the log
+        except Exception:
+            pass
 
     # if anything genuinely failed, propagate non-zero exit for CI
     if fail:
