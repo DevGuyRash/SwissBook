@@ -1072,6 +1072,37 @@ def test_make_proxy_ws():
         assert cfg.proxy_username == "aa"
         assert cfg.proxy_password == "bb"
 
+
+@pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
+def test_insecure_flag(monkeypatch, tmp_path: Path):
+    """--insecure should disable SSL verification on the session."""
+
+    monkeypatch.setattr(ytb, "detect", lambda _u: ("playlist", "X"))
+    monkeypatch.setattr(
+        ytb.scrapetube,
+        "get_playlist",
+        lambda *_a, **_k: [{"videoId": "x", "title": {"runs": [{"text": "d"}]}}],
+    )
+
+    captured = {}
+
+    class _FakeApi:
+        def __init__(self, *_, **kw):
+            captured["verify"] = kw["http_client"].verify
+
+        def fetch(self, *a, **kw):
+            class _FT:
+                def to_raw_data(self):
+                    return []
+
+            return _FT()
+
+    monkeypatch.setattr(ytb, "YouTubeTranscriptApi", _FakeApi)
+
+    run_cli(tmp_path, "dummy", "-n", "1", "--insecure")
+
+    assert captured["verify"] is False
+
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
 def test_proxy_file_rotation(monkeypatch, tmp_path: Path, capsys):
     proxy_file = tmp_path / "proxies.txt"

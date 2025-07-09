@@ -104,6 +104,7 @@ python -m yt_bulk_cc.yt_bulk_cc --convert ./out -f srt -o ./out_srt
 | **Utilities**                          |                        |                                                                                                                                  |
 | `--convert`                            | _(path)_               | Converts existing JSON transcripts from a file or directory to the specified `-f` format.                                        |
 | `--overwrite`                          |                        | Re-download and overwrite files even if they already exist.                                                                      |
+| `--insecure`                           |                        | Disable SSL certificate verification (useful with some proxies). |
 | `-v`, `--verbose`                      |                        | Increase console log verbosity (`-v` for INFO, `-vv` for DEBUG).                                                                 |
 | `-L`, `--log-file`                     | _(file)_               | Write a detailed run log to a specific file.                                                                                     |
 | `--no-log`                             |                        | Disable file logging entirely.                                                                                                   |
