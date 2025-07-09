@@ -194,6 +194,7 @@ async def grab(
     banned: set[str] | None = None,
     include_stats: bool = True,
     delay: float = 0.0,
+    verify_ssl: bool = True,
 ) -> tuple[str, str, str]:   # (status, video_id, title)
     async with sem:
         proxy_cycle = None
@@ -222,6 +223,7 @@ async def grab(
 
                 session = requests.Session()
                 session.headers.update({"User-Agent": _pick_ua()})
+                session.verify = verify_ssl
                 if cookies:
                     for c in cookies:
                         session.cookies.set(c.get("name"), c.get("value"))
@@ -490,6 +492,13 @@ async def _main() -> None:
                    help="Fetch first video once to detect IP blocks early")
     P.add_argument("--overwrite", action="store_true",
                    help="Re-download even if output file already exists")
+    P.add_argument(
+        "--insecure",
+        dest="verify_ssl",
+        action="store_false",
+        help="Disable SSL certificate verification for HTTP requests",
+    )
+    P.set_defaults(verify_ssl=True)
 
     # concatenation & splitting
     P.add_argument("-C", "--concat", action="store_true",
@@ -860,6 +869,7 @@ async def _main() -> None:
                     include_stats=args.stats and not args.concat,
                     delay=args.sleep,
                     banned=banned_proxies,
+                    verify_ssl=args.verify_ssl,
                 )
             )
 
