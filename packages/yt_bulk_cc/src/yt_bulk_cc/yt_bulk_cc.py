@@ -42,6 +42,7 @@ from pathlib import Path
 from random import choice
 import copy          # NEW
 from typing import Sequence, Callable
+import inspect
 
 import scrapetube
 from youtube_transcript_api import YouTubeTranscriptApi
@@ -610,11 +611,22 @@ async def _main() -> None:
 
     async def _update_swiftshadow(mgr: ProxyInterface) -> None:
         """Safely refresh proxies regardless of library version."""
+        # prefer the explicit async_update() API when present
         if hasattr(mgr, "async_update"):
             await mgr.async_update()
-        elif hasattr(mgr, "update"):
+            return
+
+        update_fn = getattr(mgr, "update", None)
+        if not update_fn:
+            return
+
+        if inspect.iscoroutinefunction(update_fn):
+            # async def update(); just await it directly
+            await update_fn()
+        else:
+            # synchronous update() internally runs asyncio.run(); isolate in thread
             loop = asyncio.get_running_loop()
-            await loop.run_in_executor(None, mgr.update)
+            await loop.run_in_executor(None, update_fn)
 
     # ---------- logging setup -----------------------------------------
     log_file: Path | None = None
