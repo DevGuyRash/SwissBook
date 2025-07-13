@@ -13,8 +13,7 @@
         "scripts",
         "uv.lock",
         "README.md",
-        "pyproject.toml",
-        "AGENTS.md"
+        "pyproject.toml"
       ]
     },
     "site_downloader-full-330": {
@@ -27,18 +26,16 @@
         "uv.lock",
         "scripts",
         "README.md",
-        "pyproject.toml",
-        "AGENTS.md"
+        "pyproject.toml"
       ]
     },
     "yt_bulk_cc-full-478": {
       "name": "yt_bulk_cc-full",
       "created": "2025-07-03T15:02:30.549Z",
-      "lastUsed": "2025-07-03T15:06:13.706Z",
+      "lastUsed": "2025-07-13T22:47:48.948Z",
       "tags": [],
       "files": [
         "packages/yt_bulk_cc",
-        "AGENTS.md",
         "pyproject.toml",
         "README.md",
         "scripts",
@@ -52,7 +49,6 @@
       "tags": [],
       "files": [
         "scripts",
-        "AGENTS.md",
         "pyproject.toml",
         "README.md",
         "uv.lock",
