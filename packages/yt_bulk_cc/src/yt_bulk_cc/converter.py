@@ -2,6 +2,7 @@
 Expose the `convert_existing` helper so callers don't have to reach into
 private modules.
 """
+
 from __future__ import annotations
 
 import json
@@ -23,6 +24,7 @@ __all__ = [
 # Helper generators / transformers
 # ---------------------------------------------------------------------------
 
+
 def iter_json_files(path: Path | str) -> Iterable[Path]:
     """Yield every *.json* file under *path* (file or directory)."""
     p = Path(path).expanduser()
@@ -32,9 +34,8 @@ def iter_json_files(path: Path | str) -> Iterable[Path]:
         yield from p.rglob("*.json")
 
 
-
-
 # Recursive flatten helper ----------------------------------------------------
+
 
 def extract_cues(blob):
     """Return a flat list of cues from a single- or multi-video JSON object."""
@@ -52,7 +53,10 @@ def extract_cues(blob):
 # Public conversion API
 # ---------------------------------------------------------------------------
 
-def convert_existing(src: str | Path, dest_fmt: str, out_dir: Path, *, include_stats: bool = True) -> None:
+
+def convert_existing(
+    src: str | Path, dest_fmt: str, out_dir: Path, *, include_stats: bool = True
+) -> None:
     """Convert previously downloaded JSON transcript(s) to *dest_fmt*.
 
     Parameters
@@ -67,7 +71,8 @@ def convert_existing(src: str | Path, dest_fmt: str, out_dir: Path, *, include_s
         If *True* and the format supports it, prepend a stats header.
     """
     from .formatters import FMT, EXT
-    from . import _stats as _legacy_stats, _fixup_loop, _single_file_header  # type: ignore
+    from .header import _fixup_loop, _single_file_header
+    from .utils import stats as _legacy_stats
 
     out_dir.mkdir(parents=True, exist_ok=True)
     dest_ext = EXT[dest_fmt]
@@ -118,4 +123,4 @@ def convert_existing(src: str | Path, dest_fmt: str, out_dir: Path, *, include_s
 
         dst = out_dir / jfile.with_suffix(f".{dest_ext}").name
         dst.write_text(new_txt, encoding="utf-8")
-        logging.info("✔ converted %s → %s", jfile.name, dst.name) 
+        logging.info("✔ converted %s → %s", jfile.name, dst.name)
