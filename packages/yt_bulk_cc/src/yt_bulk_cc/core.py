@@ -15,7 +15,7 @@ import requests
 from youtube_transcript_api.proxies import GenericProxyConfig
 from youtube_transcript_api.proxies import WebshareProxyConfig
 from .user_agent import _pick_ua
-from .utils import stats as _stats, detect, make_proxy as _make_proxy
+from .utils import coerce_attr, detect, make_proxy as _make_proxy, stats as _stats
 
 import scrapetube
 import time

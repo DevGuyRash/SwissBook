@@ -390,3 +390,27 @@ def test_concat_order(tmp_path: Path, monkeypatch):
     vids = [f"v{i}" for i in range(5)]  # v0 … v4, in order
 
     # Patch scrapetube for this one test
+    monkeypatch.setattr(ytb, "detect", lambda _u: ("playlist", "demo"))
+    monkeypatch.setattr(
+        ytb,
+        "video_iter",
+        lambda *_a, **_k: [
+            {"videoId": vid, "title": {"runs": [{"text": vid}]}} for vid in vids
+        ],
+    )
+    sys.argv[:] = [
+        "yt_bulk_cc.py",
+        "demo",
+        "-o",
+        str(tmp_path),
+        "-f",
+        "text",
+        "-C",
+        "--basename",
+        "combined",
+    ]
+    ytb.asyncio.run(ytb.main())
+
+    data = (tmp_path / "combined.txt").read_text()
+    found = [line.split()[1] for line in data.splitlines() if line.startswith("──── ")]
+    assert found == vids

@@ -724,18 +724,15 @@ async def _main() -> None:
                 if exceed and (w_tot or l_tot or c_tot):
                     _rollover()
                     pred_meta = [(vid, title)]
-                    body_w = w_p
-                    body_l = l_p
-                    body_c = c_p
                     if args.stats:
                         _, pred_w, pred_l, pred_c = _fixup_loop(
                             (body_w, body_l, body_c), args.format, pred_meta
                         )
                 dst.write(piece)
                 meta_list.append((vid, title))
-                w_tot += w_p
-                l_tot += l_p
-                c_tot += c_p
+                w_tot += body_w
+                l_tot += body_l
+                c_tot += body_c
             dst.close()
             if args.stats:
                 hdr, w_tot, l_tot, c_tot = _fixup_loop(
