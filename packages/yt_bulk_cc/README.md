@@ -1,4 +1,4 @@
-# 📺 YouTube Bulk CC Downloader (`yt_bulk_cc.py`)
+# 📺 YouTube Bulk CC Downloader (`yt-bulk-cc`)
 
 A powerful Python script to bulk-download YouTube captions/transcripts for single videos, playlists, or entire channels. It requires no API key and can scrape public, members-only, and private content (with cookies).
 
@@ -37,19 +37,20 @@ source .venv/bin/activate
 
 ## Usage
 
-The script is invoked via `python -m yt_bulk_cc.yt_bulk_cc`.
+The command line interface installs as `yt-bulk-cc`. You can also run it via
+`python -m yt_bulk_cc`.
 
 ### Quick Examples
 
 ```bash
 # 1. Download a single video's transcript as an SRT file
-python -m yt_bulk_cc.yt_bulk_cc "https://youtu.be/dQw4w9WgXcQ" -f srt
+yt-bulk-cc "https://youtu.be/dQw4w9WgXcQ" -f srt
 
 # 2. Download an entire playlist as individual JSON files
-python -m yt_bulk_cc.yt_bulk_cc "https://youtube.com/playlist?list=PLxyz123" -f json
+yt-bulk-cc "https://youtube.com/playlist?list=PLxyz123" -f json
 
 # 3. Download all transcripts from a channel using its handle
-python -m yt_bulk_cc.yt_bulk_cc "https://www.youtube.com/@Recipe4Porkchops"
+yt-bulk-cc "https://www.youtube.com/@Recipe4Porkchops"
 ```
 
 The command produces a detailed summary and lists files that were successfully downloaded or skipped.
@@ -60,17 +61,17 @@ To combine these downloaded files, you can run the same command with the `--conc
 
 ```bash
 # 4. Concatenate the transcripts from the previous step
-python -m yt_bulk_cc.yt_bulk_cc "https://www.youtube.com/@Recipe4Porkchops" --concat
+yt-bulk-cc "https://www.youtube.com/@Recipe4Porkchops" --concat
 ```
 
 ![Example Concatenation Run](assets/yt_bulk_cc-example_02.png)
 
 ```bash
 # 5. Concatenate all transcripts from a different channel into a single text file
-python -m yt_bulk_cc.yt_bulk_cc "https://www.youtube.com/@CrashCourse" -f text --concat channel_output
+yt-bulk-cc "https://www.youtube.com/@CrashCourse" -f text --concat channel_output
 
 # 6. Convert an existing directory of JSON files to SRT
-python -m yt_bulk_cc.yt_bulk_cc --convert ./out -f srt -o ./out_srt
+yt-bulk-cc --convert ./out -f srt -o ./out_srt
 ```
 
 ### Command-Line Options
