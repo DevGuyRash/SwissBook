@@ -27,7 +27,6 @@ from .utils import (
     shorten_path as _shorten_for_windows,
     slug,
     stats as _stats,
-    detect,
     make_proxy as _make_proxy,
 )
 from .formatters import TimeStampedText, FMT, EXT
@@ -206,11 +205,17 @@ async def _main() -> None:
         "--public-proxy-country",
         help="Comma-separated list of country codes for public proxies",
     )
+    P.add_argument(
+        "--convert",
+        metavar="FILE",
+        help="Convert an existing JSON file to another format and exit",
+    )
     P.add_argument("--cookie-json", help="Load cookies from a Netscape or JSON file")
     P.add_argument(
         "--basename", default="captions", help="Base filename for concatenated output"
     )
     P.add_argument(
+        "-C",
         "--concat",
         action="store_true",
         help="Concatenate multiple transcripts into a single file",
@@ -360,7 +365,10 @@ async def _main() -> None:
     if args.timestamps:
         FMT["text"] = TimeStampedText(show=True)
         FMT["pretty"] = TimeStampedText(show=True)
-    kind, ident = detect(args.LINK)
+    from importlib import import_module
+
+    ytb = import_module("yt_bulk_cc")
+    kind, ident = ytb.detect(args.LINK)
     out_dir = Path(args.folder).expanduser()
     out_dir.mkdir(parents=True, exist_ok=True)
     videos = list(video_iter(kind, ident, args.limit, args.sleep))
@@ -371,6 +379,7 @@ async def _main() -> None:
         sys.exit(1)
     logging.info("Found %s videos", len(videos))
     proxy_pool: list[str] | None = None
+    proxy_cfg = None
     proxies: list[str] = []
     cli_proxies: list[str] = []
     file_proxies: list[str] = []
@@ -436,18 +445,19 @@ async def _main() -> None:
     public_count = len(public) if args.public_proxy is not None else 0
     proxy_cycle = None
     if proxies:
-        proxy_pool = list(dict.fromkeys(proxies))
-        if public_count:
-            logging.info(
-                "%d proxies loaded (%d from Swiftshadow/SOCKS list, %d from CLI/file)",
-                len(proxy_pool),
-                public_count,
-                len(cli_proxies) + len(file_proxies),
-            )
+        if len(proxies) == 1:
+            proxy_cfg = _make_proxy(proxies[0])
         else:
-            logging.info("%d proxies loaded from CLI/file", len(proxy_pool))
-    if proxy_pool and proxy_cfg:
-        logging.debug("Single proxy supplied; ignoring proxy list")
+            proxy_pool = list(dict.fromkeys(proxies))
+            if public_count:
+                logging.info(
+                    "%d proxies loaded (%d from Swiftshadow/SOCKS list, %d from CLI/file)",
+                    len(proxy_pool),
+                    public_count,
+                    len(cli_proxies) + len(file_proxies),
+                )
+            else:
+                logging.info("%d proxies loaded from CLI/file", len(proxy_pool))
     cookies_data: list | None = None
     if args.cookie_json:
         try:

@@ -26,6 +26,8 @@ from .errors import (
     TranscriptsDisabled,
     TooManyRequests,
     IpBlocked,
+    VideoUnavailable,
+    CouldNotRetrieveTranscript,
 )
 from .formatters import FMT
 from .header import _single_file_header, _fixup_loop  # type: ignore

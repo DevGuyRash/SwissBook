@@ -5,6 +5,11 @@ from __future__ import annotations
 import asyncio as _aio
 import sys as _sys
 
+try:  # Optional dependency
+    import scrapetube as _scrapetube
+except Exception:  # pragma: no cover - optional
+    _scrapetube = None  # type: ignore
+
 from .utils import slug, stats as _stats, detect, shorten_path as _shorten_for_windows
 from .formatters import TimeStampedText, FMT, EXT
 from .converter import convert_existing
@@ -20,6 +25,7 @@ from .errors import (
 from .core import grab, video_iter, probe_video
 from .header import _fixup_loop, _single_file_header, _header_text, _prepend_header
 from .user_agent import _pick_ua
+from .cli import main
 
 __all__ = [
     "slug",
@@ -45,10 +51,13 @@ __all__ = [
     "_header_text",
     "_prepend_header",
     "_pick_ua",
+    "main",
+    "scrapetube",
 ]
 
 # Alias ``yt_bulk_cc.yt_bulk_cc`` to this module for backward compatibility
 _sys.modules[f"{__name__}.yt_bulk_cc"] = _sys.modules[__name__]
+scrapetube = _scrapetube
 
 # ---------------------------------------------------------------------------
 # Make asyncio.run tolerant when already inside a running event loop.
