@@ -11,7 +11,9 @@ import asyncio
 import logging
 from pathlib import Path
 from typing import Sequence
+import json
 import requests
+from importlib import import_module
 from youtube_transcript_api.proxies import GenericProxyConfig
 from youtube_transcript_api.proxies import WebshareProxyConfig
 from .user_agent import _pick_ua
@@ -31,6 +33,12 @@ from .errors import (
 )
 from .formatters import FMT
 from .header import _single_file_header, _fixup_loop  # type: ignore
+
+
+def _ua() -> str:
+    """Return a random User-Agent string (patched in tests)."""
+    return import_module("yt_bulk_cc")._pick_ua()
+
 
 __all__ = [
     "grab",
@@ -72,7 +80,7 @@ def probe_video(
             label = "direct"
 
         session = requests.Session()
-        session.headers.update({"User-Agent": _pick_ua()})
+        session.headers.update({"User-Agent": _ua()})
         if cookies:
             for c in cookies:
                 session.cookies.set(c.get("name"), c.get("value"))
@@ -153,7 +161,7 @@ async def grab(
                     proxy = proxy_cfg
 
                 session = requests.Session()
-                session.headers.update({"User-Agent": _pick_ua()})
+                session.headers.update({"User-Agent": _ua()})
                 if cookies:
                     for c in cookies:
                         session.cookies.set(c.get("name"), c.get("value"))

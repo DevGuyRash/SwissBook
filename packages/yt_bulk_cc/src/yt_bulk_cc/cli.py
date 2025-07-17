@@ -31,13 +31,13 @@ from .utils import (
 )
 from .formatters import TimeStampedText, FMT, EXT
 from .converter import convert_existing
-from .core import grab, video_iter, probe_video
 from .header import _single_file_header, _fixup_loop, _header_text, _prepend_header
 
 try:
-    from swiftshadow.classes import ProxyInterface
+    from swiftshadow.classes import ProxyInterface as _ProxyInterface
 except Exception:  # pragma: no cover - optional dep
-    ProxyInterface = None  # type: ignore
+    _ProxyInterface = None  # type: ignore
+ProxyInterface = _ProxyInterface
 from .errors import (
     CouldNotRetrieveTranscript,
     NoTranscriptFound,
@@ -194,6 +194,8 @@ async def _main() -> None:
     P.add_argument("--proxy-file", help="File containing one proxy URL per line")
     P.add_argument(
         "--public-proxy",
+        nargs="?",
+        const=1,
         type=int,
         metavar="N",
         help="Use N public proxies from Swiftshadow or SOCKS list",
@@ -371,7 +373,7 @@ async def _main() -> None:
     kind, ident = ytb.detect(args.LINK)
     out_dir = Path(args.folder).expanduser()
     out_dir.mkdir(parents=True, exist_ok=True)
-    videos = list(video_iter(kind, ident, args.limit, args.sleep))
+    videos = list(ytb.video_iter(kind, ident, args.limit, args.sleep))
     if args.limit:
         videos = videos[: args.limit]
     if not videos:
@@ -419,11 +421,11 @@ async def _main() -> None:
             except Exception as e:
                 logging.error("Failed to fetch SOCKS proxies: %s", e)
         else:
-            if ProxyInterface is None:
+            if ytb.ProxyInterface is None:
                 logging.error("Swiftshadow not installed")
             else:
                 try:
-                    mgr = ProxyInterface(
+                    mgr = ytb.ProxyInterface(
                         countries=countries,
                         protocol=args.public_proxy_type,
                         maxProxies=args.public_proxy,
@@ -470,7 +472,9 @@ async def _main() -> None:
     banned_proxies: set[str] = set()
     if args.check_ip:
         first_vid = videos[0]["videoId"]
-        ok_probe, banned_proxies = probe_video(
+        from importlib import import_module
+
+        ok_probe, banned_proxies = import_module("yt_bulk_cc.core").probe_video(
             first_vid,
             cookies=cookies_data,
             proxy_pool=proxy_pool,
@@ -499,7 +503,7 @@ async def _main() -> None:
             skipped.append(("ok", vid, title))
             continue
         tasks.append(
-            grab(
+            ytb.grab(
                 vid,
                 title,
                 path,
@@ -728,6 +732,7 @@ async def _main() -> None:
                         _, pred_w, pred_l, pred_c = _fixup_loop(
                             (body_w, body_l, body_c), args.format, pred_meta
                         )
+                dst.write(SEP(vid, title))
                 dst.write(piece)
                 meta_list.append((vid, title))
                 w_tot += body_w

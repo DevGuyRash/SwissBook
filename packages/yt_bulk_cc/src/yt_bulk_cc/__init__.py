@@ -4,14 +4,25 @@ from __future__ import annotations
 
 import asyncio as _aio
 import sys as _sys
+from random import choice as _choice
+from youtube_transcript_api.proxies import (
+    GenericProxyConfig,
+    WebshareProxyConfig,
+)
 
 try:  # Optional dependency
     import scrapetube as _scrapetube
 except Exception:  # pragma: no cover - optional
     _scrapetube = None  # type: ignore
 
+try:
+    from swiftshadow.classes import ProxyInterface as _ProxyInterface
+except Exception:  # pragma: no cover - optional
+    _ProxyInterface = None  # type: ignore
+
 from .utils import slug, stats as _stats, detect, shorten_path as _shorten_for_windows
 from .formatters import TimeStampedText, FMT, EXT
+import requests as _requests
 from .converter import convert_existing
 from .errors import (
     CouldNotRetrieveTranscript,
@@ -51,6 +62,12 @@ __all__ = [
     "_header_text",
     "_prepend_header",
     "_pick_ua",
+    "GenericProxyConfig",
+    "WebshareProxyConfig",
+    "asyncio",
+    "requests",
+    "ProxyInterface",
+    "choice",
     "main",
     "scrapetube",
 ]
@@ -58,6 +75,10 @@ __all__ = [
 # Alias ``yt_bulk_cc.yt_bulk_cc`` to this module for backward compatibility
 _sys.modules[f"{__name__}.yt_bulk_cc"] = _sys.modules[__name__]
 scrapetube = _scrapetube
+asyncio = _aio
+requests = _requests
+ProxyInterface = _ProxyInterface
+choice = _choice
 
 # ---------------------------------------------------------------------------
 # Make asyncio.run tolerant when already inside a running event loop.

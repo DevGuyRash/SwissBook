@@ -61,12 +61,14 @@ def patch_scrapetube(monkeypatch):
         get_channel=lambda channel_url, **kw: vids,
     )
     monkeypatch.setattr(ytb, "scrapetube", fake)
+    monkeypatch.setattr(ytb.core, "scrapetube", fake)
     yield
 
 
 @pytest.fixture
 def patch_detect(monkeypatch):
     monkeypatch.setattr(ytb, "detect", lambda url: ("playlist", "PLfake"))
+    monkeypatch.setattr(ytb.core, "detect", lambda url: ("playlist", "PLfake"))
     yield
 
 
