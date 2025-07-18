@@ -297,6 +297,7 @@ def test_pool_multiple_webshare(monkeypatch, tmp_path: Path):
 
     async def _fake_grab(*_a, **kw):
         captured["pool"] = kw.get("proxy_pool")
+        captured["cfg"] = kw.get("proxy_cfg")
         return ("ok", "x", "t")
 
     monkeypatch.setattr(ytb, "grab", _fake_grab)
@@ -563,6 +564,7 @@ def test_public_proxy_limit(monkeypatch, tmp_path: Path):
 
     async def _fake_grab(*_a, **kw):
         captured["pool"] = kw.get("proxy_pool")
+        captured["cfg"] = kw.get("proxy_cfg")
         return ("ok", "x", "t")
 
     monkeypatch.setattr(ytb, "grab", _fake_grab)
@@ -570,3 +572,32 @@ def test_public_proxy_limit(monkeypatch, tmp_path: Path):
     run_cli(tmp_path, "dummy", "--public-proxy", "2", "-n", "1")
 
     assert captured["pool"] == ["http://pub:1", "http://pub:2"]
+
+
+@pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
+def test_public_proxy_validation_fail(monkeypatch, tmp_path: Path):
+    """CLI should not abort when proxy validation fails."""
+
+    class _PI:
+        def __init__(self, *a, **k):
+            self.proxies = [SimpleNamespace(as_string=lambda: "http://pub:1")]
+
+    monkeypatch.setattr(ytb, "ProxyInterface", _PI)
+
+    def fake_get(*_a, **_k):
+        raise Exception("boom")
+
+    monkeypatch.setattr(ytb.requests, "get", fake_get)
+
+    captured = {}
+
+    async def _fake_grab(*_a, **kw):
+        captured["pool"] = kw.get("proxy_pool")
+        captured["cfg"] = kw.get("proxy_cfg")
+        return ("ok", "x", "t")
+
+    monkeypatch.setattr(ytb, "grab", _fake_grab)
+
+    run_cli(tmp_path, "dummy", "--public-proxy", "1", "-n", "1")
+
+    assert isinstance(captured.get("cfg"), ytb.GenericProxyConfig)
