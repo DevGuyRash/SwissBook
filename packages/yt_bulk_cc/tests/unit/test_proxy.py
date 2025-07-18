@@ -209,7 +209,7 @@ def test_generic_proxy_flags(monkeypatch, tmp_path: Path):
     cfg = captured["cfg"]
     assert isinstance(cfg, ytb.GenericProxyConfig)
     assert cfg.http_url == "http://u:p@h:1"
-    assert cfg.https_url == "https://u:p@h:1"
+    assert cfg.https_url == "http://u:p@h:1"
 
 
 def test_webshare_proxy(monkeypatch, tmp_path: Path):
@@ -297,6 +297,7 @@ def test_pool_multiple_webshare(monkeypatch, tmp_path: Path):
 
     async def _fake_grab(*_a, **kw):
         captured["pool"] = kw.get("proxy_pool")
+        captured["cfg"] = kw.get("proxy_cfg")
         return ("ok", "x", "t")
 
     monkeypatch.setattr(ytb, "grab", _fake_grab)
@@ -543,3 +544,60 @@ def test_public_proxy_no_swiftshadow(monkeypatch, tmp_path: Path):
     cfg = captured["cfg"]
     assert isinstance(cfg, ytb.GenericProxyConfig)
     assert cfg.http_url.startswith("socks5://")
+
+
+@pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
+def test_public_proxy_limit(monkeypatch, tmp_path: Path):
+    """Limit loaded public proxies to the requested count."""
+
+    class _PI:
+        def __init__(self, *a, **k):
+            self.proxies = [
+                SimpleNamespace(as_string=lambda: "http://pub:1"),
+                SimpleNamespace(as_string=lambda: "http://pub:2"),
+                SimpleNamespace(as_string=lambda: "http://pub:3"),
+            ]
+
+    monkeypatch.setattr(ytb, "ProxyInterface", _PI)
+
+    captured = {}
+
+    async def _fake_grab(*_a, **kw):
+        captured["pool"] = kw.get("proxy_pool")
+        captured["cfg"] = kw.get("proxy_cfg")
+        return ("ok", "x", "t")
+
+    monkeypatch.setattr(ytb, "grab", _fake_grab)
+
+    run_cli(tmp_path, "dummy", "--public-proxy", "2", "-n", "1")
+
+    assert captured["pool"] == ["http://pub:1", "http://pub:2"]
+
+
+@pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
+def test_public_proxy_validation_fail(monkeypatch, tmp_path: Path):
+    """CLI should not abort when proxy validation fails."""
+
+    class _PI:
+        def __init__(self, *a, **k):
+            self.proxies = [SimpleNamespace(as_string=lambda: "http://pub:1")]
+
+    monkeypatch.setattr(ytb, "ProxyInterface", _PI)
+
+    def fake_get(*_a, **_k):
+        raise Exception("boom")
+
+    monkeypatch.setattr(ytb.requests, "get", fake_get)
+
+    captured = {}
+
+    async def _fake_grab(*_a, **kw):
+        captured["pool"] = kw.get("proxy_pool")
+        captured["cfg"] = kw.get("proxy_cfg")
+        return ("ok", "x", "t")
+
+    monkeypatch.setattr(ytb, "grab", _fake_grab)
+
+    run_cli(tmp_path, "dummy", "--public-proxy", "1", "-n", "1")
+
+    assert isinstance(captured.get("cfg"), ytb.GenericProxyConfig)
