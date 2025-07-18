@@ -29,7 +29,7 @@ def run_cli(tmp_path: Path, *argv: str) -> None:
 
 def test_real_playlist(tmp_path: Path):
     playlist = (
-        "https://www.youtube.com/playlist?list=PLsRNoUx8w3rNvG9OQk4aHj4s5A_c7dlyV"
+        "https://www.youtube.com/playlist?list=PLjV3HijScGMynGvjJrvNNd5Q9pPy255dL"
     )
     try:
         run_cli(tmp_path, playlist, "-n", "1")
@@ -51,7 +51,7 @@ def test_real_channel(tmp_path: Path):
 
 def test_real_playlist_with_limit(tmp_path: Path):
     playlist = (
-        "https://www.youtube.com/playlist?list=PLsRNoUx8w3rNvG9OQk4aHj4s5A_c7dlyV"
+        "https://www.youtube.com/playlist?list=PLjV3HijScGMynGvjJrvNNd5Q9pPy255dL"
     )
     try:
         run_cli(tmp_path, playlist, "-n", "2")
