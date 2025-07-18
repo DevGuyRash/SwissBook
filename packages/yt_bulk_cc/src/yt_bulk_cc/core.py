@@ -147,7 +147,7 @@ async def grab(
                             break
                     else:
                         logging.error("All proxies appear blocked; abort %s", vid)
-                        return ("fail", vid, title)
+                        return ("proxy_fail", vid, title)
                     proxy = _make_proxy(addr)
                 elif proxy_cfg:
                     proxy = proxy_cfg
@@ -256,11 +256,11 @@ async def grab(
                         banned.add(addr)
                     if delay:
                         await asyncio.sleep(delay)
-                    return ("fail", vid, title)
+                    return ("proxy_fail", vid, title)
                 await asyncio.sleep(0.5 * attempt)
         if delay:
             await asyncio.sleep(delay)
-        return ("fail", vid, title)
+        return ("proxy_fail", vid, title)
 
 
 def video_iter(kind: str, ident: str, limit: int | None, pause: int):

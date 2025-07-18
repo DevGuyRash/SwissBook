@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import time
+import concurrent.futures
 import copy
 import asyncio
-import contextlib
 import datetime
 import glob
 import json
@@ -431,7 +432,7 @@ async def _main() -> None:
                         await mgr.async_update()
                     elif hasattr(mgr, "update"):
                         mgr.update()
-                    public = [p.as_string() for p in mgr.proxies][: args.public_proxy]
+                    public = [p.as_string() for p in mgr.proxies][: args.public_proxy]  # Defensive limit in case lib ignores maxProxies
                     proxies.extend(public)
                     logging.info(
                         "Loaded %d public %s proxies via Swiftshadow",
@@ -440,6 +441,37 @@ async def _main() -> None:
                     )
                 except Exception as e:
                     logging.error("Swiftshadow failed: %s", e)
+        # Validate proxies for HTTPS/YouTube compatibility
+        def validate_proxy(proxy_url: str) -> str | None:
+            """Synchronous proxy validation with retries."""
+            VALIDATION_URL = "https://www.youtube.com"
+            TIMEOUT_SEC = 6
+            RETRIES = 2
+            for attempt in range(RETRIES + 1):
+                try:
+                    resp = ytb.requests.get(
+                        VALIDATION_URL,
+                        proxies={"http": proxy_url, "https": proxy_url},
+                        timeout=TIMEOUT_SEC,
+                    )
+                    if 200 <= resp.status_code < 300:  # Allow redirects but ensure success range
+                        return proxy_url
+                except Exception as e:
+                    if attempt == RETRIES:
+                        logging.debug(f"Proxy {proxy_url} failed after {RETRIES} retries: {e}")
+                    time.sleep(0.5 * attempt)  # Backoff
+            return None
+
+        if public:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+                futures = [executor.submit(validate_proxy, p) for p in public]
+                results = [f.result() for f in concurrent.futures.as_completed(futures)]
+            proxies_valid = [p for p in results if p]
+            if not proxies_valid:
+                logging.error("No valid public proxies for HTTPS/YouTube. Aborting.")
+                sys.exit(2)
+            proxies = [p for p in proxies if p in proxies_valid]
+            logging.info("%d public proxies validated for HTTPS/YouTube", len(proxies_valid))
     public_count = len(public) if args.public_proxy is not None else 0
     proxy_cycle = None
     if proxies:
@@ -550,6 +582,7 @@ async def _main() -> None:
     ok = [r for r in results if r[0] == "ok"] + skipped
     none = [r for r in results if r[0] == "none"]
     fail = [r for r in results if r[0] == "fail"]
+    proxy_fail = [r for r in results if r[0] == "proxy_fail"]
     if log_file and not ok and not fail:
         try:
             log_file.unlink()
@@ -565,21 +598,25 @@ async def _main() -> None:
             print(f"\n{C.RED}Videos that ultimately failed:{C.END}")
             for _, vid, title in fail:
                 print(f"{C.RED}  • https://youtu.be/{vid} — {title[:70]}{C.END}")
+        if proxy_fail:
+            print(f"\n{C.RED}Videos that failed due to proxy/network errors:{C.END}")
+            for _, vid, title in proxy_fail:
+                print(f"{C.RED}  • https://youtu.be/{vid} — {title[:70]}{C.END}")
         sys.stdout.flush()
         logging.info(
             "Summary: ✓ %s   •  ↯ no-caption %s   •  ⚠ failed %s   •  🚫 proxies banned %s   (total %s)",
             len(ok),
             len(none),
-            len(fail),
+            len(fail) + len(proxy_fail),
             len(banned_proxies),
-            len(ok) + len(none) + len(fail),
+            len(ok) + len(none) + len(fail) + len(proxy_fail),
         )
         print(
             f"Summary: ✓ {C.GRN}{len(ok)}{C.END}   •  "
             f"↯ no-caption {C.YEL}{len(none)}{C.END}   •  "
-            f"⚠ failed {C.RED}{len(fail)}{C.END}   "
+            f"⚠ failed {C.RED}{len(fail) + len(proxy_fail)}{C.END}   "
             f"🚫 proxies banned {C.RED}{len(banned_proxies)}{C.END}   "
-            f"(total {len(ok)+len(none)+len(fail)})"
+            f"(total {len(ok)+len(none)+len(fail)+len(proxy_fail)})"
         )
         if banned_proxies:
             formatted = "\n".join(f"  • {p}" for p in sorted(banned_proxies))
