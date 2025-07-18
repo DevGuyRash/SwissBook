@@ -209,7 +209,7 @@ def test_generic_proxy_flags(monkeypatch, tmp_path: Path):
     cfg = captured["cfg"]
     assert isinstance(cfg, ytb.GenericProxyConfig)
     assert cfg.http_url == "http://u:p@h:1"
-    assert cfg.https_url == "https://u:p@h:1"
+    assert cfg.https_url == "http://u:p@h:1"
 
 
 def test_webshare_proxy(monkeypatch, tmp_path: Path):

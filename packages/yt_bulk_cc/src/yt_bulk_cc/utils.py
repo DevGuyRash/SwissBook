@@ -125,10 +125,7 @@ def make_proxy(url: str) -> GenericProxyConfig | WebshareProxyConfig:
         creds = url.split("://", 1)[1]
         user, pwd = creds.split(":", 1)
         return WebshareProxyConfig(user, pwd)
-    parsed = urlparse(url)
-    if parsed.scheme in ("http", "https"):
-        http_url = urlunparse(parsed._replace(scheme="http"))
-        https_url = urlunparse(parsed._replace(scheme="https"))
-    else:
-        http_url = https_url = url
-    return GenericProxyConfig(http_url=http_url, https_url=https_url)
+    
+    # Use the same URL for both http and https.
+    # Requests can tunnel HTTPS over an HTTP proxy.
+    return GenericProxyConfig(http_url=url, https_url=url)
