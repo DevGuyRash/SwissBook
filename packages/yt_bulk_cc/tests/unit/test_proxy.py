@@ -543,3 +543,30 @@ def test_public_proxy_no_swiftshadow(monkeypatch, tmp_path: Path):
     cfg = captured["cfg"]
     assert isinstance(cfg, ytb.GenericProxyConfig)
     assert cfg.http_url.startswith("socks5://")
+
+
+@pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
+def test_public_proxy_limit(monkeypatch, tmp_path: Path):
+    """Limit loaded public proxies to the requested count."""
+
+    class _PI:
+        def __init__(self, *a, **k):
+            self.proxies = [
+                SimpleNamespace(as_string=lambda: "http://pub:1"),
+                SimpleNamespace(as_string=lambda: "http://pub:2"),
+                SimpleNamespace(as_string=lambda: "http://pub:3"),
+            ]
+
+    monkeypatch.setattr(ytb, "ProxyInterface", _PI)
+
+    captured = {}
+
+    async def _fake_grab(*_a, **kw):
+        captured["pool"] = kw.get("proxy_pool")
+        return ("ok", "x", "t")
+
+    monkeypatch.setattr(ytb, "grab", _fake_grab)
+
+    run_cli(tmp_path, "dummy", "--public-proxy", "2", "-n", "1")
+
+    assert captured["pool"] == ["http://pub:1", "http://pub:2"]

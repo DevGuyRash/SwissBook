@@ -431,7 +431,7 @@ async def _main() -> None:
                         await mgr.async_update()
                     elif hasattr(mgr, "update"):
                         mgr.update()
-                    public = [p.as_string() for p in mgr.proxies]
+                    public = [p.as_string() for p in mgr.proxies][: args.public_proxy]
                     proxies.extend(public)
                     logging.info(
                         "Loaded %d public %s proxies via Swiftshadow",
