@@ -468,10 +468,15 @@ async def _main() -> None:
                 results = [f.result() for f in concurrent.futures.as_completed(futures)]
             proxies_valid = [p for p in results if p]
             if not proxies_valid:
-                logging.error("No valid public proxies for HTTPS/YouTube. Aborting.")
-                sys.exit(2)
-            proxies = [p for p in proxies if p in proxies_valid]
-            logging.info("%d public proxies validated for HTTPS/YouTube", len(proxies_valid))
+                logging.warning(
+                    "Public proxies could not be validated; proceeding without validation."
+                )
+            else:
+                proxies = [p for p in proxies if p in proxies_valid]
+                logging.info(
+                    "%d public proxies validated for HTTPS/YouTube",
+                    len(proxies_valid),
+                )
     public_count = len(public) if args.public_proxy is not None else 0
     proxy_cycle = None
     if proxies:
