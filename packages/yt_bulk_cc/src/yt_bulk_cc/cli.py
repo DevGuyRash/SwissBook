@@ -15,7 +15,7 @@ import signal
 import sys
 import textwrap
 from pathlib import Path
-from typing import Sequence
+from typing import Sequence, Any
 
 import requests
 from rich.console import Console
@@ -36,9 +36,11 @@ from .header import _single_file_header, _fixup_loop, _header_text, _prepend_hea
 try:
     from swiftshadow.classes import ProxyInterface
     from swiftshadow import QuickProxy
+    from swiftshadow.providers import Providers
 except Exception:  # pragma: no cover - optional dep
     ProxyInterface = None  # type: ignore
     QuickProxy = None  # type: ignore
+    Providers = []  # type: ignore
 from .errors import (
     CouldNotRetrieveTranscript,
     NoTranscriptFound,
@@ -47,6 +49,27 @@ from .errors import (
     TooManyRequests,
     IpBlocked,
 )
+
+
+async def async_quick_proxy(
+    countries: list[str] | None = None, protocol: str = "http"
+) -> Any:
+    """Asynchronously fetch a single proxy using Swiftshadow providers."""
+    if countries is None:
+        countries = []
+    for provider in Providers:
+        if protocol not in provider.protocols:
+            continue
+        if countries and not provider.countryFilter:
+            continue
+        try:
+            proxies = await provider.providerFunction(countries, protocol)
+            if proxies:
+                return proxies[0]
+        except Exception as exc:  # pragma: no cover - provider failure
+            logging.debug("QuickProxy provider error: %s", exc)
+            continue
+    return None
 
 
 class C:
@@ -430,8 +453,8 @@ async def _main() -> None:
                 wanted = args.public_proxy
                 while len(public) < wanted and attempts < wanted * 5:
                     try:
-                        p = QuickProxy(countries=countries, protocol=args.public_proxy_type)
                         attempts += 1
+                        p = await async_quick_proxy(countries, args.public_proxy_type)
                         if p is None:
                             continue
                         s = p.as_string()
@@ -439,7 +462,6 @@ async def _main() -> None:
                             public.append(s)
                     except Exception as e:
                         logging.debug("QuickProxy error: %s", e)
-                        attempts += 1
                 proxies.extend(public)
                 logging.info(
                     "Loaded %d public %s proxies via QuickProxy",
