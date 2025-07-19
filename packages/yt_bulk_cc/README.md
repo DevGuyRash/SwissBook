@@ -88,7 +88,7 @@ yt-bulk-cc --convert ./out -f srt -o ./out_srt
 | **Output & Formatting**                |                        |                                                                                                                                  |
 | `-t`, `--timestamps`                   |                        | Adds `[hh:mm:ss.mmm]` timestamps to `text` format.                                                                               |
 | `--no-seq-prefix`                      |                        | Disables the `00001-` numeric prefix on filenames.                                                                               |
-| `--stats`<br>`--no-stats`              |                        | Toggles the inclusion of statistics headers in output files. (Default: on)                                                       |
+| `--stats`<br>`--no-stats`              |                        | Enable or disable statistics headers in output files. Stats are on by default; use `--no-stats` to turn them off or `--stats` to override a disabled configuration. |
 | `-C`, `--concat`                       |                        | Concatenate all results into a single file.                                                                                      |
 | `--basename`                           | _(name)_               | Base filename for concatenated output. Default: `combined`.                                                                      |
 | `--split`                              | _(e.g. 10000c)_        | With `--concat`, splits the output into new files when a size threshold is met.<br>Units: `w` (words), `l` (lines), `c` (chars). |
@@ -108,11 +108,19 @@ yt-bulk-cc --convert ./out -f srt -o ./out_srt
 | `-v`, `--verbose`                      |                        | Increase console log verbosity (`-v` for INFO, `-vv` for DEBUG).                                                                 |
 | `-L`, `--log-file`                     | _(file)_               | Write a detailed run log to a specific file.                                                                                     |
 | `--no-log`                             |                        | Disable file logging entirely.                                                                                                   |
-| `-F`, `--formats-help`                 |                        | Show examples of each output format and exit.                                                                                    |
+| `-F`, `--formats-help`                 |                        | Show examples of each output format and exit.
+                                     |
+
+> **Note**
+> The table above reflects the current command-line options. If you notice discrepancies in older docs or screenshots, this README is authoritative.
 
 ### Proxy usage
 
-Use `-p`/`--proxy` and `--proxy-file` to provide a single proxy or a rotation list. Each URL may include credentials, for example `http://user:pass@host:port`. To use Webshare residential proxies pass `ws://USER:PASS` as the proxy URL. With `--public-proxy` the tool fetches a small pool of free proxies; you can pass a number as `--public-proxy N` or `--public-proxy=N` (default 5). Use `--public-proxy-country` and `--public-proxy-type` to refine the pool. User-supplied proxies always take precedence, with public ones used as a fallback. At startup the tool logs how many proxies came from the CLI and how many were loaded from a file. With `-v` you'll see which proxy is used for each request and when one gets banned. The logfile (created automatically unless `--no-log` is used) always records the full `-vv` debug output, so detailed retry information is preserved even if the console is less verbose.
+Use `-p`/`--proxy` and `--proxy-file` to provide a single proxy or a rotation list. Each URL may include credentials, for example `http://user:pass@host:port`. To use Webshare residential proxies pass `ws://USER:PASS` as the proxy URL. With `--public-proxy` the tool fetches a small pool of free proxies; you can pass a number as `--public-proxy N` or `--public-proxy=N` (default 5). These are retrieved one-by-one via Swiftshadow's `QuickProxy` helper so the tool never downloads more proxies than requested. Use `--public-proxy-country` and `--public-proxy-type` to refine the pool. User-supplied proxies always take precedence, with public ones used as a fallback. At startup the tool logs how many proxies came from the CLI and how many were loaded from a file. With `-v` you'll see which proxy is used for each request and when one gets banned. The logfile (created automatically unless `--no-log` is used) always records the full `-vv` debug output, so detailed retry information is preserved even if the console is less verbose.
+
+### Checking for IP bans
+
+Use `--check-ip` to run a quick probe before downloading. The script fetches the first video's transcript with your selected proxy settings and exits early if it detects an IP ban. Because this extra request adds a small startup delay, it is opt-in rather than the default.
 
 ### Exporting cookies
 

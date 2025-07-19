@@ -35,8 +35,10 @@ from .header import _single_file_header, _fixup_loop, _header_text, _prepend_hea
 
 try:
     from swiftshadow.classes import ProxyInterface
+    from swiftshadow import QuickProxy
 except Exception:  # pragma: no cover - optional dep
     ProxyInterface = None  # type: ignore
+    QuickProxy = None  # type: ignore
 from .errors import (
     CouldNotRetrieveTranscript,
     NoTranscriptFound,
@@ -361,6 +363,9 @@ async def _main() -> None:
         level=root_logger_level,
         handlers=[console_handler] + ([file_handler] if file_handler else []),
     )
+    logging.getLogger("swiftshadow").setLevel(
+        logging.DEBUG if args.verbose > 1 else logging.WARNING
+    )
     if args.timestamps:
         FMT["text"] = TimeStampedText(show=True)
         FMT["pretty"] = TimeStampedText(show=True)
@@ -418,8 +423,33 @@ async def _main() -> None:
             except Exception as e:
                 logging.error("Failed to fetch SOCKS proxies: %s", e)
         else:
-            if ytb.ProxyInterface is None:
+            if QuickProxy is None and ytb.ProxyInterface is None:
                 logging.error("Swiftshadow not installed")
+            elif QuickProxy is not None:
+                attempts = 0
+                wanted = args.public_proxy
+                while len(public) < wanted and attempts < wanted * 5:
+                    try:
+                        p = await asyncio.to_thread(
+                            QuickProxy,
+                            countries=countries,
+                            protocol=args.public_proxy_type,
+                        )
+                        attempts += 1
+                        if p is None:
+                            continue
+                        s = p.as_string()
+                        if s not in public:
+                            public.append(s)
+                    except Exception as e:
+                        logging.debug("QuickProxy error: %s", e)
+                        attempts += 1
+                proxies.extend(public)
+                logging.info(
+                    "Loaded %d public %s proxies via QuickProxy",
+                    len(public),
+                    args.public_proxy_type.upper(),
+                )
             else:
                 try:
                     mgr = ytb.ProxyInterface(
@@ -432,7 +462,7 @@ async def _main() -> None:
                         await mgr.async_update()
                     elif hasattr(mgr, "update"):
                         mgr.update()
-                    public = [p.as_string() for p in mgr.proxies][: args.public_proxy]  # Defensive limit in case lib ignores maxProxies
+                    public = [p.as_string() for p in mgr.proxies][: args.public_proxy]
                     proxies.extend(public)
                     logging.info(
                         "Loaded %d public %s proxies via Swiftshadow",
@@ -441,6 +471,7 @@ async def _main() -> None:
                     )
                 except Exception as e:
                     logging.error("Swiftshadow failed: %s", e)
+
         # Validate proxies for HTTPS/YouTube compatibility
         def validate_proxy(proxy_url: str) -> str | None:
             """Synchronous proxy validation with retries."""
@@ -454,11 +485,15 @@ async def _main() -> None:
                         proxies={"http": proxy_url, "https": proxy_url},
                         timeout=TIMEOUT_SEC,
                     )
-                    if 200 <= resp.status_code < 300:  # Allow redirects but ensure success range
+                    if (
+                        200 <= resp.status_code < 300
+                    ):  # Allow redirects but ensure success range
                         return proxy_url
                 except Exception as e:
                     if attempt == RETRIES:
-                        logging.debug(f"Proxy {proxy_url} failed after {RETRIES} retries: {e}")
+                        logging.debug(
+                            f"Proxy {proxy_url} failed after {RETRIES} retries: {e}"
+                        )
                     time.sleep(0.5 * attempt)  # Backoff
             return None
 
@@ -503,6 +538,22 @@ async def _main() -> None:
             sys.exit(1)
     pre_results: list[tuple[str, str, str]] = []
     banned_proxies: set[str] = set()
+    progress = None
+    bar_task = None
+    try:
+        from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
+
+        progress = Progress(
+            SpinnerColumn(),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            console=term_console,
+        )
+        progress.start()
+        bar_task = progress.add_task("Preparing", total=len(videos))
+    except ModuleNotFoundError:  # pragma: no cover - rich optional
+        pass
+
     if args.check_ip:
         first_vid = videos[0]["videoId"]
         ok_probe, banned_proxies = ytb.probe_video(
@@ -514,6 +565,8 @@ async def _main() -> None:
         )
         if not ok_probe:
             msg = "Current IP appears blocked"
+            if progress:
+                progress.stop()
             print(msg)
             logging.error(msg)
             sys.exit(2)
@@ -552,43 +605,37 @@ async def _main() -> None:
                 delay=args.sleep,
             )
         )
+    if progress and bar_task is not None:
+        progress.update(
+            bar_task, description="Downloading", completed=0, total=len(tasks)
+        )
     if not tasks and not skipped and not pre_results:
         logging.info("Nothing to do (all files already present).")
+        if progress:
+            progress.stop()
         return
+    orig_console_level = console_handler.level
+    console_handler.setLevel(logging.ERROR)
     try:
-        from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
-
-        async def rich_gather(coros):
-            with Progress(
-                SpinnerColumn(),
-                BarColumn(),
-                TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-                console=term_console,
-            ) as bar:
-                tid = bar.add_task("Downloading", total=len(coros))
-                res = []
-                for fut in asyncio.as_completed(coros):
-                    res.append(await fut)
-                    bar.update(tid, advance=1)
-                return res
-
-        orig_console_level = console_handler.level
-        console_handler.setLevel(logging.ERROR)
-        try:
-            results = await rich_gather(tasks)
-        finally:
-            console_handler.setLevel(orig_console_level)
-            for h in logging.getLogger().handlers:
-                if isinstance(h, logging.FileHandler):
-                    h.flush()
-    except ModuleNotFoundError:
-        results = await asyncio.gather(*tasks)
+        results = []
+        for fut in asyncio.as_completed(tasks):
+            results.append(await fut)
+            if progress and bar_task is not None:
+                progress.update(bar_task, advance=1)
+        if progress:
+            progress.stop()
+    finally:
+        console_handler.setLevel(orig_console_level)
+        for h in logging.getLogger().handlers:
+            if isinstance(h, logging.FileHandler):
+                h.flush()
+    results = pre_results + results
     results = pre_results + results
     ok = [r for r in results if r[0] == "ok"] + skipped
     none = [r for r in results if r[0] == "none"]
     fail = [r for r in results if r[0] == "fail"]
     proxy_fail = [r for r in results if r[0] == "proxy_fail"]
-    if log_file and not ok and not fail:
+    if log_file and not ok and not fail and not proxy_fail:
         try:
             log_file.unlink()
         except FileNotFoundError:
