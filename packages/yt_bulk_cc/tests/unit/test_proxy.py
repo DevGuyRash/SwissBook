@@ -395,14 +395,14 @@ def test_proxy_file_rotation(monkeypatch, tmp_path: Path, capsys):
 def test_public_proxy(monkeypatch, tmp_path: Path):
     captured: dict[str, Any] = {}
 
-    class _PI:
-        def __init__(self, *a, **k):
-            _PI.called = True
-            captured.update(k)
-            self.proxies = [SimpleNamespace(as_string=lambda: "http://pub:1")]
+    calls: list[dict[str, Any]] = []
 
-    monkeypatch.setattr(ytb, "ProxyInterface", _PI)
-    monkeypatch.setattr(ytb, "choice", lambda seq: seq[0])
+    async def _qp(*a, **k):
+        calls.append({"args": a, **k})
+        idx = len(calls)
+        return SimpleNamespace(as_string=lambda: f"http://pub:{idx}")
+
+    monkeypatch.setattr(ytb.cli, "async_quick_proxy", _qp)
 
     async def _fake_grab(*_a, **kw):
         captured["pool"] = kw.get("proxy_pool")
@@ -410,25 +410,24 @@ def test_public_proxy(monkeypatch, tmp_path: Path):
 
     monkeypatch.setattr(ytb, "grab", _fake_grab)
 
-    _PI.called = False
     run_cli(tmp_path, "dummy", "--public-proxy", "3", "-n", "1")
 
-    assert _PI.called
-    assert captured["maxProxies"] == 3
-    assert captured["protocol"] == "http"
+    assert len(calls) == 3
+    assert captured["pool"] == ["http://pub:1", "http://pub:2", "http://pub:3"]
+    assert calls[0]["args"][1] == "http"
 
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
 def test_public_proxy_with_cli(monkeypatch, tmp_path: Path):
     captured = {}
 
-    class _PI:
-        def __init__(self, *a, **k):
-            _PI.called = True
-            self.proxies = [SimpleNamespace(as_string=lambda: "http://pub:1")]
+    calls: list[dict[str, Any]] = []
 
-    monkeypatch.setattr(ytb, "ProxyInterface", _PI)
-    monkeypatch.setattr(ytb, "choice", lambda seq: seq[0])
+    async def _qp(*a, **k):
+        calls.append({"args": a, **k})
+        return SimpleNamespace(as_string=lambda: "http://pub:1")
+
+    monkeypatch.setattr(ytb.cli, "async_quick_proxy", _qp)
 
     async def _fake_grab(*_a, **kw):
         captured["pool"] = kw.get("proxy_pool")
@@ -436,23 +435,24 @@ def test_public_proxy_with_cli(monkeypatch, tmp_path: Path):
 
     monkeypatch.setattr(ytb, "grab", _fake_grab)
 
-    _PI.called = False
     run_cli(tmp_path, "dummy", "-p", "http://cli", "--public-proxy", "1", "-n", "1")
 
-    assert _PI.called
+    assert len(calls) == 1
     assert captured["pool"] == ["http://cli", "http://pub:1"]
 
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
 def test_public_proxy_https(monkeypatch, tmp_path: Path):
     called: dict[str, Any] = {}
+    calls: list[dict[str, Any]] = []
 
-    class _PI:
-        def __init__(self, *a, **k):
-            called.update(k)
-            self.proxies = [SimpleNamespace(as_string=lambda: "https://pub:1")]
+    async def _qp(*a, **k):
+        called.update(k)
+        calls.append({"args": a, **k})
+        idx = len(calls)
+        return SimpleNamespace(as_string=lambda: f"https://pub:{idx}")
 
-    monkeypatch.setattr(ytb, "ProxyInterface", _PI)
+    monkeypatch.setattr(ytb.cli, "async_quick_proxy", _qp)
 
     async def _fake_grab(*_a, **kw):
         return ("ok", "x", "t")
@@ -470,8 +470,8 @@ def test_public_proxy_https(monkeypatch, tmp_path: Path):
         "1",
     )
 
-    assert called["protocol"] == "https"
-    assert called["maxProxies"] == 2
+    assert calls and calls[0]["args"][1] == "https"
+    assert len(calls) == 2
 
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
@@ -550,15 +550,14 @@ def test_public_proxy_no_swiftshadow(monkeypatch, tmp_path: Path):
 def test_public_proxy_limit(monkeypatch, tmp_path: Path):
     """Limit loaded public proxies to the requested count."""
 
-    class _PI:
-        def __init__(self, *a, **k):
-            self.proxies = [
-                SimpleNamespace(as_string=lambda: "http://pub:1"),
-                SimpleNamespace(as_string=lambda: "http://pub:2"),
-                SimpleNamespace(as_string=lambda: "http://pub:3"),
-            ]
+    calls: list[int] = []
 
-    monkeypatch.setattr(ytb, "ProxyInterface", _PI)
+    async def _qp(*a, **k):
+        calls.append(1)
+        idx = len(calls)
+        return SimpleNamespace(as_string=lambda: f"http://pub:{idx}")
+
+    monkeypatch.setattr(ytb.cli, "async_quick_proxy", _qp)
 
     captured = {}
 
@@ -572,17 +571,17 @@ def test_public_proxy_limit(monkeypatch, tmp_path: Path):
     run_cli(tmp_path, "dummy", "--public-proxy", "2", "-n", "1")
 
     assert captured["pool"] == ["http://pub:1", "http://pub:2"]
+    assert len(calls) == 2
 
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
 def test_public_proxy_validation_fail(monkeypatch, tmp_path: Path):
     """CLI should not abort when proxy validation fails."""
 
-    class _PI:
-        def __init__(self, *a, **k):
-            self.proxies = [SimpleNamespace(as_string=lambda: "http://pub:1")]
+    async def _qp(*a, **k):
+        return SimpleNamespace(as_string=lambda: "http://pub:1")
 
-    monkeypatch.setattr(ytb, "ProxyInterface", _PI)
+    monkeypatch.setattr(ytb.cli, "async_quick_proxy", _qp)
 
     def fake_get(*_a, **_k):
         raise Exception("boom")
@@ -601,3 +600,27 @@ def test_public_proxy_validation_fail(monkeypatch, tmp_path: Path):
     run_cli(tmp_path, "dummy", "--public-proxy", "1", "-n", "1")
 
     assert isinstance(captured.get("cfg"), ytb.GenericProxyConfig)
+
+
+@pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
+def test_public_proxy_no_runtime_warning(monkeypatch, tmp_path: Path, capsys):
+    calls = 0
+
+    async def _qp(*a, **k):
+        nonlocal calls
+        calls += 1
+        return SimpleNamespace(as_string=lambda: f"http://pub:{calls}")
+
+    monkeypatch.setattr(ytb.cli, "async_quick_proxy", _qp)
+    monkeypatch.setattr(ytb.cli, "QuickProxy", lambda *a, **k: (_ for _ in ()).throw(AssertionError))
+
+    async def _fake_grab(*_a, **kw):
+        return ("ok", "x", "t")
+
+    monkeypatch.setattr(ytb, "grab", _fake_grab)
+
+    run_cli(tmp_path, "dummy", "--public-proxy", "2", "-n", "1")
+
+    out = capsys.readouterr()
+    assert "RuntimeWarning" not in out.err
+    assert calls == 2

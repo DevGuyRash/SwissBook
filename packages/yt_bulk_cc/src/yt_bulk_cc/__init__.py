@@ -39,8 +39,11 @@ from .user_agent import _pick_ua
 
 try:
     from swiftshadow.classes import ProxyInterface
+    from swiftshadow import QuickProxy as _QuickProxy
 except Exception:  # pragma: no cover - optional
     ProxyInterface = None  # type: ignore
+    _QuickProxy = None  # type: ignore
+QuickProxy = _QuickProxy
 from .cli import main
 
 __all__ = [
@@ -76,6 +79,7 @@ __all__ = [
     "GenericProxyConfig",
     "WebshareProxyConfig",
     "ProxyInterface",
+    "QuickProxy",
     "json",
     "choice",
 ]
@@ -90,6 +94,7 @@ requests = _requests
 GenericProxyConfig = GenericProxyConfig
 WebshareProxyConfig = WebshareProxyConfig
 ProxyInterface = ProxyInterface
+QuickProxy = _QuickProxy
 json = _json
 choice = _choice
 

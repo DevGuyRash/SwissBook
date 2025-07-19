@@ -100,6 +100,10 @@ def probe_video(
                 )
                 time.sleep(wait)  # Use time.sleep for synchronous probe
                 continue
+            except requests.exceptions.RequestException as exc:
+                logging.debug("Probe network error via %s: %s", label, exc)
+                time.sleep(1 * attempt)
+                continue
             except Exception:
                 return True, banned  # Other errors are not considered IP blocks
         if addr:
@@ -248,6 +252,17 @@ async def grab(
                     tries,
                 )
                 await asyncio.sleep(wait)
+                continue
+            except requests.exceptions.RequestException as exc:
+                logging.debug("Network error for %s via %s: %s", vid, addr or proxy_cfg, exc)
+                if attempt == tries:
+                    logging.error("%s after %d tries – giving up", exc, attempt)
+                    if addr:
+                        banned.add(addr)
+                    if delay:
+                        await asyncio.sleep(delay)
+                    return ("proxy_fail", vid, title)
+                await asyncio.sleep(1.0 * attempt)
                 continue
             except Exception as exc:
                 if attempt == tries:
