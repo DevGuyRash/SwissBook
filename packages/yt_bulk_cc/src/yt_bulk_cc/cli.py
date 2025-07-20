@@ -364,9 +364,10 @@ async def _main() -> None:
         level=root_logger_level,
         handlers=[console_handler] + ([file_handler] if file_handler else []),
     )
-    logging.getLogger("swiftshadow").setLevel(
-        logging.DEBUG if args.verbose > 1 else logging.WARNING
-    )
+    logging.captureWarnings(True)
+    swift_logger = logging.getLogger("swiftshadow")
+    swift_logger.setLevel(logging.DEBUG if args.verbose > 1 else logging.WARNING)
+    swift_logger.propagate = True
     if args.timestamps:
         FMT["text"] = TimeStampedText(show=True)
         FMT["pretty"] = TimeStampedText(show=True)
@@ -439,8 +440,29 @@ async def _main() -> None:
             except Exception as e:
                 logging.error("Failed to fetch SOCKS proxies: %s", e)
         else:
-            if QuickProxy is None and ytb.ProxyInterface is None:
-                logging.error("Swiftshadow not installed")
+            if ytb.ProxyInterface is not None:
+                try:
+                    mgr = ytb.ProxyInterface(
+                        countries=countries,
+                        protocol=args.public_proxy_type,
+                        maxProxies=args.public_proxy,
+                        autoUpdate=False,
+                        debug=args.verbose > 1,
+                        logToFile=False,
+                    )
+                    if hasattr(mgr, "async_update"):
+                        await mgr.async_update()
+                    elif hasattr(mgr, "update"):
+                        await asyncio.to_thread(mgr.update)
+                    public = [p.as_string() for p in getattr(mgr, "proxies", [])][: args.public_proxy]
+                    proxies.extend(public)
+                    logging.info(
+                        "Loaded %d public %s proxies via Swiftshadow",
+                        len(public),
+                        args.public_proxy_type.upper(),
+                    )
+                except Exception as e:
+                    logging.error("Swiftshadow failed: %s", e)
             elif QuickProxy is not None:
                 attempts = 0
                 wanted = args.public_proxy
@@ -467,26 +489,7 @@ async def _main() -> None:
                     args.public_proxy_type.upper(),
                 )
             else:
-                try:
-                    mgr = ytb.ProxyInterface(
-                        countries=countries,
-                        protocol=args.public_proxy_type,
-                        maxProxies=args.public_proxy,
-                        autoUpdate=False,
-                    )
-                    if hasattr(mgr, "async_update"):
-                        await mgr.async_update()
-                    elif hasattr(mgr, "update"):
-                        mgr.update()
-                    public = [p.as_string() for p in mgr.proxies][: args.public_proxy]
-                    proxies.extend(public)
-                    logging.info(
-                        "Loaded %d public %s proxies via Swiftshadow",
-                        len(public),
-                        args.public_proxy_type.upper(),
-                    )
-                except Exception as e:
-                    logging.error("Swiftshadow failed: %s", e)
+                logging.error("Swiftshadow not installed")
 
         # Validate proxies for HTTPS/YouTube compatibility
         def validate_proxy(proxy_url: str) -> str | None:
@@ -644,18 +647,17 @@ async def _main() -> None:
 
     def _emit_final_summary() -> None:
         if none:
-            print(f"\n{C.YEL}Videos without captions:{C.END}")
+            logging.warning("Videos without captions:")
             for _, vid, title in none:
-                print(f"{C.YEL}  • https://youtu.be/{vid} — {title[:70]}{C.END}")
+                logging.warning("  • https://youtu.be/%s — %s", vid, title[:70])
         if fail:
-            print(f"\n{C.RED}Videos that ultimately failed:{C.END}")
+            logging.error("Videos that ultimately failed:")
             for _, vid, title in fail:
-                print(f"{C.RED}  • https://youtu.be/{vid} — {title[:70]}{C.END}")
+                logging.error("  • https://youtu.be/%s — %s", vid, title[:70])
         if proxy_fail:
-            print(f"\n{C.RED}Videos that failed due to proxy/network errors:{C.END}")
+            logging.error("Videos that failed due to proxy/network errors:")
             for _, vid, title in proxy_fail:
-                print(f"{C.RED}  • https://youtu.be/{vid} — {title[:70]}{C.END}")
-        sys.stdout.flush()
+                logging.error("  • https://youtu.be/%s — %s", vid, title[:70])
         logging.info(
             "Summary: ✓ %s   •  ↯ no-caption %s   •  ⚠ failed %s   •  🚫 proxies banned %s   (total %s)",
             len(ok),
@@ -664,20 +666,9 @@ async def _main() -> None:
             len(banned_proxies),
             len(ok) + len(none) + len(fail) + len(proxy_fail),
         )
-        print(
-            f"Summary: ✓ {C.GRN}{len(ok)}{C.END}   •  "
-            f"↯ no-caption {C.YEL}{len(none)}{C.END}   •  "
-            f"⚠ failed {C.RED}{len(fail) + len(proxy_fail)}{C.END}   "
-            f"🚫 proxies banned {C.RED}{len(banned_proxies)}{C.END}   "
-            f"(total {len(ok)+len(none)+len(fail)+len(proxy_fail)})"
-        )
         if banned_proxies:
             formatted = "\n".join(f"  • {p}" for p in sorted(banned_proxies))
             logging.info("Banned proxies:\n%s", formatted)
-            print("Banned proxies:")
-            for p in sorted(banned_proxies):
-                print(f"  • {p}")
-        sys.stdout.flush()
 
     stats_files: list[Path] = []
     _seen_stats: set[Path] = set()

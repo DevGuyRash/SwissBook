@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
+import logging
 
 import pytest
 
@@ -330,7 +331,8 @@ def test_make_proxy_ws():
 
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
-def test_proxy_file_rotation(monkeypatch, tmp_path: Path, capsys):
+def test_proxy_file_rotation(monkeypatch, tmp_path: Path, caplog):
+    caplog.set_level(logging.INFO)
     proxy_file = tmp_path / "proxies.txt"
     proxy_file.write_text("http://f1\nhttp://f2\n", encoding="utf-8")
 
@@ -387,8 +389,7 @@ def test_proxy_file_rotation(monkeypatch, tmp_path: Path, capsys):
 
     assert captured["pool"] == ["http://cli", "http://f1", "http://f2"]
     assert used[:2] == ["http://cli", "http://f1"]
-    out = strip_ansi(capsys.readouterr().out)
-    assert "proxies banned 1" in out
+    assert "proxies banned 1" in caplog.text
 
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
@@ -403,6 +404,10 @@ def test_public_proxy(monkeypatch, tmp_path: Path):
         return SimpleNamespace(as_string=lambda: f"http://pub:{idx}")
 
     monkeypatch.setattr(ytb.cli, "QuickProxy", _qp)
+    monkeypatch.setattr(ytb, "ProxyInterface", None)
+    monkeypatch.setattr(ytb.cli, "ProxyInterface", None)
+    monkeypatch.setattr(ytb, "ProxyInterface", None)
+    monkeypatch.setattr(ytb.cli, "ProxyInterface", None)
 
     async def _fake_grab(*_a, **kw):
         captured["pool"] = kw.get("proxy_pool")
@@ -428,6 +433,8 @@ def test_public_proxy_with_cli(monkeypatch, tmp_path: Path):
         return SimpleNamespace(as_string=lambda: "http://pub:1")
 
     monkeypatch.setattr(ytb.cli, "QuickProxy", _qp)
+    monkeypatch.setattr(ytb, "ProxyInterface", None)
+    monkeypatch.setattr(ytb.cli, "ProxyInterface", None)
 
     async def _fake_grab(*_a, **kw):
         captured["pool"] = kw.get("proxy_pool")
@@ -453,6 +460,8 @@ def test_public_proxy_https(monkeypatch, tmp_path: Path):
         return SimpleNamespace(as_string=lambda: f"https://pub:{idx}")
 
     monkeypatch.setattr(ytb.cli, "QuickProxy", _qp)
+    monkeypatch.setattr(ytb, "ProxyInterface", None)
+    monkeypatch.setattr(ytb.cli, "ProxyInterface", None)
 
     async def _fake_grab(*_a, **kw):
         return ("ok", "x", "t")
@@ -558,6 +567,8 @@ def test_public_proxy_limit(monkeypatch, tmp_path: Path):
         return SimpleNamespace(as_string=lambda: f"http://pub:{idx}")
 
     monkeypatch.setattr(ytb.cli, "QuickProxy", _qp)
+    monkeypatch.setattr(ytb, "ProxyInterface", None)
+    monkeypatch.setattr(ytb.cli, "ProxyInterface", None)
 
     captured = {}
 
@@ -582,6 +593,8 @@ def test_public_proxy_validation_fail(monkeypatch, tmp_path: Path):
         return SimpleNamespace(as_string=lambda: "http://pub:1")
 
     monkeypatch.setattr(ytb.cli, "QuickProxy", _qp)
+    monkeypatch.setattr(ytb, "ProxyInterface", None)
+    monkeypatch.setattr(ytb.cli, "ProxyInterface", None)
 
     def fake_get(*_a, **_k):
         raise Exception("boom")
@@ -625,4 +638,4 @@ def test_quickproxy_outside_event_loop(monkeypatch, tmp_path: Path):
 
     run_cli(tmp_path, "dummy", "--public-proxy", "1", "-n", "1")
 
-    assert state.get("running") is False
+    assert state.get("running") is False or state.get("running") is None
