@@ -323,8 +323,9 @@ async def _main() -> None:
                 self._file = file_stream
 
             def write(self, data):
+                cleaned = data.replace("\r", "")
                 self._console.write(data)
-                self._file.write(_ANSI_RE.sub("", data))
+                self._file.write(_ANSI_RE.sub("", cleaned))
 
             def flush(self):
                 self._console.flush()
@@ -382,6 +383,21 @@ async def _main() -> None:
         logging.error("No videos found - is the link correct?")
         sys.exit(1)
     logging.info("Found %s videos", len(videos))
+    progress = None
+    bar_task = None
+    try:
+        from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
+
+        progress = Progress(
+            SpinnerColumn(),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            console=term_console,
+        )
+        progress.start()
+        bar_task = progress.add_task("Preparing", total=len(videos))
+    except ModuleNotFoundError:  # pragma: no cover - rich optional
+        pass
     proxy_pool: list[str] | None = None
     proxy_cfg = None
     proxies: list[str] = []
@@ -538,21 +554,6 @@ async def _main() -> None:
             sys.exit(1)
     pre_results: list[tuple[str, str, str]] = []
     banned_proxies: set[str] = set()
-    progress = None
-    bar_task = None
-    try:
-        from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
-
-        progress = Progress(
-            SpinnerColumn(),
-            BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            console=term_console,
-        )
-        progress.start()
-        bar_task = progress.add_task("Preparing", total=len(videos))
-    except ModuleNotFoundError:  # pragma: no cover - rich optional
-        pass
 
     if args.check_ip:
         first_vid = videos[0]["videoId"]
@@ -635,7 +636,7 @@ async def _main() -> None:
     none = [r for r in results if r[0] == "none"]
     fail = [r for r in results if r[0] == "fail"]
     proxy_fail = [r for r in results if r[0] == "proxy_fail"]
-    if log_file and not ok and not fail and not proxy_fail:
+    if log_file and not ok and not fail and not none and not proxy_fail:
         try:
             log_file.unlink()
         except FileNotFoundError:

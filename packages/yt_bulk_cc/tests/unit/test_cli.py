@@ -204,8 +204,8 @@ def test_no_caption_flow(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(ytb, "detect", lambda _: ("playlist", "X"))
     run_cli(tmp_path, "x", "-f", "text", "-n", "1")
-    # No output files should be created when a caption is not found
-    assert not list(tmp_path.iterdir())
+    files = list(tmp_path.iterdir())
+    assert len(files) == 1 and files[0].suffix == ".log"
 
 
 # ────────────────────────── header-stats sanity  ─────────────────────── #
