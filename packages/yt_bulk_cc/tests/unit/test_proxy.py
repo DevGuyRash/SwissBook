@@ -368,6 +368,7 @@ def test_proxy_file_rotation(monkeypatch, tmp_path: Path, capsys):
         return None
 
     monkeypatch.setattr(ytb.asyncio, "sleep", _no_sleep)
+    monkeypatch.setattr(ytb.requests, "get", lambda *a, **k: SimpleNamespace(status_code=200))
 
     run_cli(
         tmp_path,
@@ -388,7 +389,8 @@ def test_proxy_file_rotation(monkeypatch, tmp_path: Path, capsys):
     assert captured["pool"] == ["http://cli", "http://f1", "http://f2"]
     assert used[:2] == ["http://cli", "http://f1"]
     out = strip_ansi(capsys.readouterr().out)
-    assert "proxies banned 1" in out
+    log = next(tmp_path.glob("*.log")).read_text()
+    assert "proxies banned 1" in log
 
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
@@ -572,6 +574,75 @@ def test_public_proxy_limit(monkeypatch, tmp_path: Path):
 
     assert captured["pool"] == ["http://pub:1", "http://pub:2"]
     assert len(calls) == 2
+
+
+@pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
+def test_proxyinterface_used_before_quickproxy(monkeypatch, tmp_path: Path):
+    """ProxyInterface cache should satisfy requests without QuickProxy."""
+
+    class _Mgr:
+        def __init__(self, *a, **k):
+            self.proxies = []
+
+        async def async_update(self):
+            self.proxies = [SimpleNamespace(as_string=lambda: "http://cache:1")]
+
+        update = async_update
+
+    calls: list[int] = []
+
+    def _qp(*a, **k):
+        calls.append(1)
+        return SimpleNamespace(as_string=lambda: "http://pub:1")
+
+    monkeypatch.setattr(ytb, "ProxyInterface", _Mgr)
+    monkeypatch.setattr(ytb.cli, "QuickProxy", _qp)
+    monkeypatch.setattr(ytb.requests, "get", lambda *a, **k: SimpleNamespace(status_code=200))
+
+    captured = {}
+
+    async def _fake_grab(*_a, **kw):
+        captured["pool"] = kw.get("proxy_pool")
+        return ("ok", "x", "t")
+
+    monkeypatch.setattr(ytb, "grab", _fake_grab)
+
+    run_cli(tmp_path, "dummy", "--public-proxy", "1", "-n", "1")
+
+    assert calls == []
+
+
+@pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
+def test_swiftshadow_logs_to_file(monkeypatch, tmp_path: Path, capsys):
+    """swiftshadow logger output should go only to the log file by default."""
+
+    import logging
+
+    class _Mgr:
+        def __init__(self, *a, **k):
+            self.proxies = []
+
+        async def async_update(self):
+            logging.getLogger("swiftshadow").warning("cache warn")
+            self.proxies = [SimpleNamespace(as_string=lambda: "http://cache:1")]
+
+        update = async_update
+
+    monkeypatch.setattr(ytb, "ProxyInterface", _Mgr)
+    monkeypatch.setattr(ytb.cli, "QuickProxy", None)
+
+    async def _fake_grab(*_a, **kw):
+        return ("ok", "x", "t")
+
+    monkeypatch.setattr(ytb, "grab", _fake_grab)
+
+    run_cli(tmp_path, "dummy", "--public-proxy", "1", "-n", "1")
+
+    out = strip_ansi(capsys.readouterr().out)
+    assert "cache warn" not in out
+
+    log = next(tmp_path.glob("*.log")).read_text()
+    assert "cache warn" in log
 
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
