@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import warnings
 import time
 import concurrent.futures
 import copy
@@ -39,6 +40,11 @@ try:
 except Exception:  # pragma: no cover - optional dep
     ProxyInterface = None  # type: ignore
     QuickProxy = None  # type: ignore
+
+try:
+    from site_downloader.proxy import ProxyPool
+except Exception:  # pragma: no cover - optional dep
+    ProxyPool = None  # type: ignore
 from .errors import (
     CouldNotRetrieveTranscript,
     NoTranscriptFound,
@@ -197,10 +203,19 @@ async def _main() -> None:
         "--public-proxy",
         type=int,
         metavar="N",
-        help="Use N public proxies from Swiftshadow or SOCKS list",
+        help="(Deprecated) Retained for compat; enabling uses SwiftShadow pool.",
     )
     P.add_argument(
-        "--public-proxy-type", choices=["http", "https", "socks"], default="http"
+        "--proxy-refresh",
+        type=int,
+        default=0,
+        help="Enable background proxy refresh every N minutes (0=disabled).",
+    )
+    P.add_argument(
+        "--public-proxy-type",
+        choices=["http", "https", "socks"],
+        default="http",
+        help=argparse.SUPPRESS,  # deprecated / internal
     )
     P.add_argument(
         "--public-proxy-country",
@@ -364,9 +379,16 @@ async def _main() -> None:
         level=root_logger_level,
         handlers=[console_handler] + ([file_handler] if file_handler else []),
     )
-    logging.getLogger("swiftshadow").setLevel(
-        logging.DEBUG if args.verbose > 1 else logging.WARNING
-    )
+    # ── Swiftshadow logging integration ─────────────────────────────────────
+    swift_log = logging.getLogger("swiftshadow")
+    swift_log.setLevel(logging.DEBUG if args.verbose > 1 else logging.INFO)
+    # Ensure all swiftshadow records land in *our* handlers (file + console)
+    swift_log.propagate = True
+    # Strip stray handlers the lib might have added (avoid dupes)
+    for _h in list(swift_log.handlers):
+        swift_log.removeHandler(_h)
+    for h in logging.getLogger().handlers:
+        swift_log.addHandler(h)
     if args.timestamps:
         FMT["text"] = TimeStampedText(show=True)
         FMT["pretty"] = TimeStampedText(show=True)
@@ -398,152 +420,37 @@ async def _main() -> None:
         bar_task = progress.add_task("Preparing", total=len(videos))
     except ModuleNotFoundError:  # pragma: no cover - rich optional
         pass
-    proxy_pool: list[str] | None = None
-    proxy_cfg = None
-    proxies: list[str] = []
-    cli_proxies: list[str] = []
-    file_proxies: list[str] = []
+    proxy_pool = None
+    proxy_cfg = None  # ensure defined for downstream references
     if args.proxy:
-        cli_proxies = [p.strip() for p in args.proxy.split(",") if p.strip()]
-        proxies.extend(cli_proxies)
+        warnings.warn(
+            "--proxy is deprecated; use --public-proxy (SwiftShadow) instead.",
+            DeprecationWarning,
+            stacklevel=0,
+        )
     if args.proxy_file:
+        warnings.warn(
+            "--proxy-file is deprecated; use --public-proxy instead.",
+            DeprecationWarning,
+            stacklevel=0,
+        )
+    if args.public_proxy and ProxyPool:
+        enable_bg = args.proxy_refresh > 0
+        proxy_pool = ProxyPool(
+            max_proxies=args.public_proxy,
+            cache_minutes=10,
+            verbose=args.verbose,
+            enable_background_refresh=enable_bg,
+            refresh_interval_minutes=args.proxy_refresh if enable_bg else None,
+        )
+        # Await initial population so first requests have proxies – safe no-op outside loop.
         try:
-            with open(args.proxy_file, "r", encoding="utf-8") as fh:
-                file_proxies = [p.strip() for p in fh if p.strip()]
-                proxies.extend(file_proxies)
+            if hasattr(proxy_pool, "ensure_ready"):
+                await proxy_pool.ensure_ready()
         except Exception as e:
-            logging.error("Cannot read proxy file %s (%s)", args.proxy_file, e)
-            sys.exit(1)
-    if args.public_proxy is not None:
-        countries: list[str] = []
-        if args.public_proxy_country:
-            countries = [
-                c.strip().upper()
-                for c in args.public_proxy_country.split(",")
-                if c.strip()
-            ]
-        public: list[str] = []
-        if args.public_proxy_type == "socks":
-            try:
-                resp = ytb.requests.get(
-                    "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks5.txt",
-                    timeout=10,
-                )
-                resp.raise_for_status()
-                lines = [
-                    line.strip() for line in resp.text.splitlines() if line.strip()
-                ]
-                public = [f"socks5://{line}" for line in lines[: args.public_proxy]]
-                proxies.extend(public)
-                logging.info("Loaded %d public SOCKS proxies", len(public))
-            except Exception as e:
-                logging.error("Failed to fetch SOCKS proxies: %s", e)
-        else:
-            if QuickProxy is None and ytb.ProxyInterface is None:
-                logging.error("Swiftshadow not installed")
-            elif QuickProxy is not None:
-                attempts = 0
-                wanted = args.public_proxy
-                while len(public) < wanted and attempts < wanted * 5:
-                    try:
-                        p = await asyncio.to_thread(
-                            QuickProxy,
-                            countries=countries,
-                            protocol=args.public_proxy_type,
-                        )
-                        attempts += 1
-                        if p is None:
-                            continue
-                        s = p.as_string()
-                        if s not in public:
-                            public.append(s)
-                    except Exception as e:
-                        logging.debug("QuickProxy error: %s", e)
-                        attempts += 1
-                proxies.extend(public)
-                logging.info(
-                    "Loaded %d public %s proxies via QuickProxy",
-                    len(public),
-                    args.public_proxy_type.upper(),
-                )
-            else:
-                try:
-                    mgr = ytb.ProxyInterface(
-                        countries=countries,
-                        protocol=args.public_proxy_type,
-                        maxProxies=args.public_proxy,
-                        autoUpdate=False,
-                    )
-                    if hasattr(mgr, "async_update"):
-                        await mgr.async_update()
-                    elif hasattr(mgr, "update"):
-                        mgr.update()
-                    public = [p.as_string() for p in mgr.proxies][: args.public_proxy]
-                    proxies.extend(public)
-                    logging.info(
-                        "Loaded %d public %s proxies via Swiftshadow",
-                        len(public),
-                        args.public_proxy_type.upper(),
-                    )
-                except Exception as e:
-                    logging.error("Swiftshadow failed: %s", e)
-
-        # Validate proxies for HTTPS/YouTube compatibility
-        def validate_proxy(proxy_url: str) -> str | None:
-            """Synchronous proxy validation with retries."""
-            VALIDATION_URL = "https://www.youtube.com"
-            TIMEOUT_SEC = 6
-            RETRIES = 2
-            for attempt in range(RETRIES + 1):
-                try:
-                    resp = ytb.requests.get(
-                        VALIDATION_URL,
-                        proxies={"http": proxy_url, "https": proxy_url},
-                        timeout=TIMEOUT_SEC,
-                    )
-                    if (
-                        200 <= resp.status_code < 300
-                    ):  # Allow redirects but ensure success range
-                        return proxy_url
-                except Exception as e:
-                    if attempt == RETRIES:
-                        logging.debug(
-                            f"Proxy {proxy_url} failed after {RETRIES} retries: {e}"
-                        )
-                    time.sleep(0.5 * attempt)  # Backoff
-            return None
-
-        if public:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-                futures = [executor.submit(validate_proxy, p) for p in public]
-                results = [f.result() for f in concurrent.futures.as_completed(futures)]
-            proxies_valid = [p for p in results if p]
-            if not proxies_valid:
-                logging.warning(
-                    "Public proxies could not be validated; proceeding without validation."
-                )
-            else:
-                proxies = [p for p in proxies if p in proxies_valid]
-                logging.info(
-                    "%d public proxies validated for HTTPS/YouTube",
-                    len(proxies_valid),
-                )
-    public_count = len(public) if args.public_proxy is not None else 0
-    proxy_cycle = None
-    if proxies:
-        if len(proxies) == 1:
-            proxy_cfg = _make_proxy(proxies[0])
-        else:
-            proxy_pool = list(dict.fromkeys(proxies))
-            if public_count:
-                logging.info(
-                    "%d proxies loaded (%d from Swiftshadow/SOCKS list, %d from CLI/file)",
-                    len(proxy_pool),
-                    public_count,
-                    len(cli_proxies) + len(file_proxies),
-                )
-            else:
-                logging.info("%d proxies loaded from CLI/file", len(proxy_pool))
+            logging.warning("Proxy pool initialisation failed, will rely on lazy/fallback: %s", e)
+    elif args.public_proxy and not ProxyPool:
+        logging.error("SwiftShadow not available; --public-proxy ignored.")
     cookies_data: list | None = None
     if args.cookie_json:
         try:
@@ -643,41 +550,40 @@ async def _main() -> None:
             pass
 
     def _emit_final_summary() -> None:
+        total = len(ok) + len(none) + len(fail) + len(proxy_fail)
         if none:
-            print(f"\n{C.YEL}Videos without captions:{C.END}")
-            for _, vid, title in none:
-                print(f"{C.YEL}  • https://youtu.be/{vid} — {title[:70]}{C.END}")
+            logging.info(
+                "Videos without captions (%d): %s",
+                len(none),
+                ", ".join(f"https://youtu.be/{vid}" for _, vid, _ in none),
+            )
         if fail:
-            print(f"\n{C.RED}Videos that ultimately failed:{C.END}")
-            for _, vid, title in fail:
-                print(f"{C.RED}  • https://youtu.be/{vid} — {title[:70]}{C.END}")
+            logging.info(
+                "Videos failed (%d): %s",
+                len(fail),
+                ", ".join(f"https://youtu.be/{vid}" for _, vid, _ in fail),
+            )
         if proxy_fail:
-            print(f"\n{C.RED}Videos that failed due to proxy/network errors:{C.END}")
-            for _, vid, title in proxy_fail:
-                print(f"{C.RED}  • https://youtu.be/{vid} — {title[:70]}{C.END}")
-        sys.stdout.flush()
+            logging.info(
+                "Videos failed due to proxy/network (%d): %s",
+                len(proxy_fail),
+                ", ".join(f"https://youtu.be/{vid}" for _, vid, _ in proxy_fail),
+            )
         logging.info(
-            "Summary: ✓ %s   •  ↯ no-caption %s   •  ⚠ failed %s   •  🚫 proxies banned %s   (total %s)",
+            "Summary: ok=%d  no_caption=%d  failed=%d  proxy_failed=%d  banned_proxies=%d  total=%d",
             len(ok),
             len(none),
-            len(fail) + len(proxy_fail),
+            len(fail),
+            len(proxy_fail),
             len(banned_proxies),
-            len(ok) + len(none) + len(fail) + len(proxy_fail),
-        )
-        print(
-            f"Summary: ✓ {C.GRN}{len(ok)}{C.END}   •  "
-            f"↯ no-caption {C.YEL}{len(none)}{C.END}   •  "
-            f"⚠ failed {C.RED}{len(fail) + len(proxy_fail)}{C.END}   "
-            f"🚫 proxies banned {C.RED}{len(banned_proxies)}{C.END}   "
-            f"(total {len(ok)+len(none)+len(fail)+len(proxy_fail)})"
+            total,
         )
         if banned_proxies:
-            formatted = "\n".join(f"  • {p}" for p in sorted(banned_proxies))
-            logging.info("Banned proxies:\n%s", formatted)
-            print("Banned proxies:")
-            for p in sorted(banned_proxies):
-                print(f"  • {p}")
-        sys.stdout.flush()
+            logging.info(
+                "Banned proxies (%d): %s",
+                len(banned_proxies),
+                ", ".join(sorted(banned_proxies)),
+            )
 
     stats_files: list[Path] = []
     _seen_stats: set[Path] = set()
@@ -874,10 +780,15 @@ async def _main() -> None:
         print()
     if args.concat and log_file:
         print(f"📝  Full log: {C.BLU}{log_file}{C.END}\n")
-    _emit_final_summary()
-    for h in logging.getLogger().handlers:
-        h.flush()
-    logging.shutdown()
+    
+    try:
+        if proxy_pool and hasattr(proxy_pool, "close"):
+            proxy_pool.close()
+    finally:
+        _emit_final_summary()
+        for h in logging.getLogger().handlers:
+            h.flush()
+        logging.shutdown()
     if fail:
         sys.exit(2)
 

@@ -113,3 +113,9 @@ if not hasattr(_aio.run, "_nested_patch"):
 
     _safe_run._nested_patch = True  # type: ignore[attr-defined]
     _aio.run = _safe_run  # type: ignore[assignment]
+
+# Central swiftshadow logger normalization (in case user imports package programmatically)
+import logging as _logging
+_swift = _logging.getLogger("swiftshadow")
+_swift.propagate = True
+_swift.handlers.clear()

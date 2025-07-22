@@ -52,8 +52,10 @@ def probe_video(
     banned = banned if banned is not None else set()
     if proxy_cfg:
         proxies = [proxy_cfg]
+    elif proxy_pool and hasattr(proxy_pool, "get"):
+        proxies = [proxy_pool.get()]
     else:
-        proxies = proxy_pool or [None]
+        proxies = [None]
     for url in proxies:
         if isinstance(url, (GenericProxyConfig, WebshareProxyConfig)):
             proxy = url
@@ -132,27 +134,22 @@ async def grab(
     delay: float = 0.0,
 ) -> tuple[str, str, str]:  # (status, video_id, title)
     async with sem:
-        proxy_cycle = None
-        if proxy_pool:
-            from itertools import cycle
-
-            proxy_cycle = cycle(proxy_pool)
         banned = banned if banned is not None else set()
 
         for attempt in range(1, tries + 1):
             try:
                 proxy = None
                 addr = None
-                if proxy_cycle:
-                    for _ in range(len(proxy_pool)):
-                        cand = next(proxy_cycle)
-                        if cand not in banned:
-                            addr = cand
+                if proxy_pool and hasattr(proxy_pool, "get"):
+                    spin = 0
+                    while spin < 5:
+                        addr = proxy_pool.get()
+                        if addr not in banned:
                             break
-                    else:
-                        logging.error("All proxies appear blocked; abort %s", vid)
+                        spin += 1
+                    if addr in banned:
+                        logging.error("All sampled proxies banned; abort %s", vid)
                         return ("proxy_fail", vid, title)
-                    proxy = _make_proxy(addr)
                 elif proxy_cfg:
                     proxy = proxy_cfg
 

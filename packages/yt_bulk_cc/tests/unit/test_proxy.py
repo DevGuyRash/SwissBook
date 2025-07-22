@@ -6,9 +6,10 @@ from typing import Any
 
 import pytest
 
-from yt_bulk_cc import yt_bulk_cc as ytb
+import yt_bulk_cc as ytb
 from yt_bulk_cc.errors import IpBlocked, TooManyRequests
 from youtube_transcript_api.proxies import GenericProxyConfig, WebshareProxyConfig
+from site_downloader.proxy import ProxyPool
 
 from conftest import run_cli, strip_ansi
 
@@ -197,19 +198,17 @@ def test_generic_proxy_flags(monkeypatch, tmp_path: Path):
 
     monkeypatch.setattr(ytb.core, "YouTubeTranscriptApi", _FakeApi)
 
-    run_cli(
-        tmp_path,
-        "dummy",
-        "-p",
-        "http://u:p@h:1",
-        "-n",
-        "1",
-    )
-
-    cfg = captured["cfg"]
-    assert isinstance(cfg, ytb.GenericProxyConfig)
-    assert cfg.http_url == "http://u:p@h:1"
-    assert cfg.https_url == "http://u:p@h:1"
+    with pytest.warns(DeprecationWarning):
+        run_cli(
+            tmp_path,
+            "dummy",
+            "-p",
+            "http://u:p@h:1",
+            "-n",
+            "1",
+        )
+    # Deprecated – Webshare now routed internally
+    assert captured["cfg"] is None
 
 
 def test_webshare_proxy(monkeypatch, tmp_path: Path):
@@ -237,19 +236,17 @@ def test_webshare_proxy(monkeypatch, tmp_path: Path):
 
     monkeypatch.setattr(ytb.core, "YouTubeTranscriptApi", _FakeApi)
 
-    run_cli(
-        tmp_path,
-        "dummy",
-        "-p",
-        "ws://user:pass",
-        "-n",
-        "1",
-    )
-
-    cfg = captured["cfg"]
-    assert isinstance(cfg, ytb.WebshareProxyConfig)
-    assert cfg.proxy_username == "user"
-    assert cfg.proxy_password == "pass"
+    with pytest.warns(DeprecationWarning):
+        run_cli(
+            tmp_path,
+            "dummy",
+            "-p",
+            "ws://user:pass",
+            "-n",
+            "1",
+        )
+    # Deprecated – Webshare now routed internally
+    assert captured["cfg"] is None
 
 
 def test_proxy_pool(monkeypatch, tmp_path: Path):
@@ -271,16 +268,17 @@ def test_proxy_pool(monkeypatch, tmp_path: Path):
 
     monkeypatch.setattr(ytb, "grab", _fake_grab)
 
-    run_cli(
-        tmp_path,
-        "dummy",
-        "-p",
-        "http://u:p@h:1,https://u2:p2@h2:2",
-        "-n",
-        "1",
-    )
-
-    assert captured["pool"] == ["http://u:p@h:1", "https://u2:p2@h2:2"]
+    with pytest.warns(DeprecationWarning):
+        run_cli(
+            tmp_path,
+            "dummy",
+            "-p",
+            "http://u:p@h:1,https://u2:p2@h2:2",
+            "-n",
+            "1",
+        )
+    # Deprecated flags → proxies handled internally
+    assert captured["pool"] is None
 
 
 def test_pool_multiple_webshare(monkeypatch, tmp_path: Path):
@@ -302,16 +300,18 @@ def test_pool_multiple_webshare(monkeypatch, tmp_path: Path):
 
     monkeypatch.setattr(ytb, "grab", _fake_grab)
 
-    run_cli(
-        tmp_path,
-        "dummy",
-        "-p",
-        "ws://u:p,ws://u2:p2",
-        "-n",
-        "1",
-    )
-
-    assert captured["pool"] == ["ws://u:p", "ws://u2:p2"]
+    with pytest.warns(DeprecationWarning):
+        run_cli(
+            tmp_path,
+            "dummy",
+            "-p",
+            "ws://u:p,ws://u2:p2",
+            "-n",
+            "1",
+        )
+    # Deprecated – no explicit pool/cfg expected
+    assert captured["pool"] is None
+    assert captured["cfg"] is None
 
 
 def test_make_proxy_ws():
@@ -369,26 +369,28 @@ def test_proxy_file_rotation(monkeypatch, tmp_path: Path, capsys):
 
     monkeypatch.setattr(ytb.asyncio, "sleep", _no_sleep)
 
-    run_cli(
-        tmp_path,
-        "dummy",
-        "-p",
-        "http://cli",
-        "--proxy-file",
-        str(proxy_file),
-        "-f",
-        "text",
-        "-n",
-        "1",
-        "-v",
-        "-s",
-        "0",
-    )
-
-    assert captured["pool"] == ["http://cli", "http://f1", "http://f2"]
-    assert used[:2] == ["http://cli", "http://f1"]
-    out = strip_ansi(capsys.readouterr().out)
-    assert "proxies banned 1" in out
+    with pytest.warns(DeprecationWarning):
+        run_cli(
+            tmp_path,
+            "dummy",
+            "-p",
+            "http://cli",
+            "--proxy-file",
+            str(proxy_file),
+            "-f",
+            "text",
+            "-n",
+            "1",
+            "-v",
+            "-s",
+            "0",
+        )
+    # Deprecated flags → CLI/file proxies are no‑ops now
+    assert captured["pool"] is None
+    # No explicit proxy_config → FakeApi saw “None”
+    assert all(u is None for u in used[:2])
+    # Summary is now logged (not printed) – nothing further to assert
+    _ = strip_ansi(capsys.readouterr().out)
 
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
@@ -412,9 +414,8 @@ def test_public_proxy(monkeypatch, tmp_path: Path):
 
     run_cli(tmp_path, "dummy", "--public-proxy", "3", "-n", "1")
 
-    assert len(calls) == 3
-    assert captured["pool"] == ["http://pub:1", "http://pub:2", "http://pub:3"]
-    assert calls[0]["protocol"] == "http"
+    # With the new ProxyPool workflow QuickProxy is no longer called.
+    assert captured["pool"] and isinstance(captured["pool"], ProxyPool)
 
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
@@ -437,8 +438,8 @@ def test_public_proxy_with_cli(monkeypatch, tmp_path: Path):
 
     run_cli(tmp_path, "dummy", "-p", "http://cli", "--public-proxy", "1", "-n", "1")
 
-    assert len(calls) == 1
-    assert captured["pool"] == ["http://cli", "http://pub:1"]
+    # QuickProxy path removed; pool handles proxies
+    assert len(calls) == 0
 
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
@@ -505,9 +506,7 @@ def test_public_proxy_socks(monkeypatch, tmp_path: Path):
         "1",
     )
 
-    cfg = called["cfg"]
-    assert isinstance(cfg, ytb.GenericProxyConfig)
-    assert cfg.http_url == "socks5://1.1.1.1:1080"
+    assert called["cfg"] is None
 
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
@@ -541,9 +540,7 @@ def test_public_proxy_no_swiftshadow(monkeypatch, tmp_path: Path):
         "1",
     )
 
-    cfg = captured["cfg"]
-    assert isinstance(cfg, ytb.GenericProxyConfig)
-    assert cfg.http_url.startswith("socks5://")
+    assert captured["cfg"] is None
 
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
@@ -599,7 +596,8 @@ def test_public_proxy_validation_fail(monkeypatch, tmp_path: Path):
 
     run_cli(tmp_path, "dummy", "--public-proxy", "1", "-n", "1")
 
-    assert isinstance(captured.get("cfg"), ytb.GenericProxyConfig)
+    assert captured.get("cfg") is None
+    assert isinstance(captured.get("pool"), ProxyPool)
 
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
@@ -625,4 +623,5 @@ def test_quickproxy_outside_event_loop(monkeypatch, tmp_path: Path):
 
     run_cli(tmp_path, "dummy", "--public-proxy", "1", "-n", "1")
 
-    assert state.get("running") is False
+    # QuickProxy path removed – state stays empty
+    assert state == {}
