@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import warnings
 import time
 import concurrent.futures
 import copy
@@ -33,6 +32,7 @@ from .utils import (
 from .formatters import TimeStampedText, FMT, EXT
 from .converter import convert_existing
 from .header import _single_file_header, _fixup_loop, _header_text, _prepend_header
+from .status_display import create_status_display
 
 try:
     from swiftshadow.classes import ProxyInterface
@@ -98,6 +98,10 @@ class ColorFormatter(logging.Formatter):
 
 
 async def _main() -> None:
+    # Suppress urllib3 connection cleanup errors during shutdown
+    import warnings
+    warnings.filterwarnings("ignore", message=".*Bad file descriptor.*", category=ResourceWarning)
+    warnings.filterwarnings("ignore", message=".*unclosed.*", category=ResourceWarning)
     class _ManFmt(
         argparse.ArgumentDefaultsHelpFormatter, argparse.RawTextHelpFormatter
     ):
@@ -204,7 +208,7 @@ async def _main() -> None:
         "--public-proxy",
         type=int,
         metavar="N",
-        help="(Deprecated) Retained for compat; enabling uses SwiftShadow pool.",
+        help="Fetch N free proxies (default 5) using Swiftshadow or a SOCKS list.",
     )
     P.add_argument(
         "--proxy-refresh",
@@ -248,6 +252,10 @@ async def _main() -> None:
         help="Exit if the current IP/proxy is blocked",
     )
     P.add_argument("--stats-top", type=int, help="Show statistics for top N files")
+    P.add_argument("--summary-stats-top", type=int, help="Show statistics for top N files (replaces --stats-top)")
+    P.add_argument("--summary-max-no-captions", type=int, default=20, help="Maximum number of no-caption videos to display in summary")
+    P.add_argument("--summary-max-failed", type=int, default=20, help="Maximum number of failed videos to display in summary")
+    P.add_argument("--summary-max-proxies", type=int, default=10, help="Maximum number of proxies to display in summary")
 
     args = P.parse_args()
     if args.formats_help:
@@ -417,40 +425,46 @@ async def _main() -> None:
         logging.error("No videos found - is the link correct?")
         sys.exit(1)
     logging.info("Found %s videos", len(videos))
-    progress = None
-    bar_task = None
-    status_display = None
-    try:
-        from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
-
-        progress = Progress(
-            SpinnerColumn(),
-            BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            console=term_console,
-        )
-        progress.start()
-        bar_task = progress.add_task("Preparing", total=len(videos))
-        
-    except ModuleNotFoundError:  # pragma: no cover - rich optional
-        pass
+    # Create dynamic status display
+    status_display = create_status_display(term_console)
+    status_display.start()
+    status_display.update_status("Preparing...")
+    status_display.set_total_videos(len(videos))
+    status_display.update_jobs(args.jobs)
     proxy_pool = None
     proxy_cfg = None  # ensure defined for downstream references
+    
+    # Process custom proxy flags (--proxy and --proxy-file)
+    proxies: list[str] = []
+    cli_proxies: list[str] = []
+    file_proxies: list[str] = []
+    
     if args.proxy:
-        warnings.warn(
-            "--proxy is deprecated; use --public-proxy (SwiftShadow) instead.",
-            DeprecationWarning,
-            stacklevel=0,
-        )
+        cli_proxies = [p.strip() for p in args.proxy.split(",") if p.strip()]
+        proxies.extend(cli_proxies)
+        logging.info("Loaded %d proxies from CLI", len(cli_proxies))
+    
     if args.proxy_file:
-        warnings.warn(
-            "--proxy-file is deprecated; use --public-proxy instead.",
-            DeprecationWarning,
-            stacklevel=0,
-        )
+        try:
+            with open(args.proxy_file, "r", encoding="utf-8") as fh:
+                file_proxies = [p.strip() for p in fh if p.strip()]
+                proxies.extend(file_proxies)
+                logging.info("Loaded %d proxies from file %s", len(file_proxies), args.proxy_file)
+        except Exception as e:
+            logging.error("Cannot read proxy file %s (%s)", args.proxy_file, e)
+            sys.exit(1)
+    
+    # Set up proxy configuration based on custom proxies
+    if proxies:
+        if len(proxies) == 1:
+            proxy_cfg = _make_proxy(proxies[0])
+            logging.info("Using single proxy: %s", proxies[0])
+        else:
+            proxy_pool = proxies
+            logging.info("Using proxy pool with %d proxies", len(proxies))
+
     if args.public_proxy and ProxyPool:
-        if console_level <= logging.INFO:
-            print(f"{C.BLU}🔄 Status: Loading proxies...{C.END}")
+        status_display.update_status("Loading public proxies...")
         
         enable_bg = args.proxy_refresh > 0
         proxy_pool = ProxyPool(
@@ -465,30 +479,19 @@ async def _main() -> None:
             if hasattr(proxy_pool, "ensure_ready"):
                 await asyncio.wait_for(proxy_pool.ensure_ready(), timeout=30.0)
             
-            # Show proxy info
-            if console_level <= logging.INFO and hasattr(proxy_pool, '_proxies'):
-                proxy_count = len(getattr(proxy_pool, '_proxies', []))
-                print(f"{C.GRN}✅ Status: Ready - {proxy_count} proxies loaded{C.END}")
-                if args.verbose >= 1:
-                    proxy_list = []
-                    for i, proxy in enumerate(getattr(proxy_pool, '_proxies', [])[:5]):  # Show first 5
-                        proxy_list.append(f"  - {proxy}")
-                    if proxy_count > 5:
-                        proxy_list.append(f"  ... and {proxy_count - 5} more")
-                    
-                    if proxy_list:
-                        print(f"{C.YEL}🌐 Proxies used:{C.END}")
-                        print("\n".join(proxy_list))
+            # Update status display with proxy info
+            if hasattr(proxy_pool, '_proxies'):
+                proxy_list = getattr(proxy_pool, '_proxies', [])
+                status_display.update_proxies(proxy_list)
+                status_display.update_status(f"Ready - {len(proxy_list)} proxies loaded")
                 
         except asyncio.TimeoutError:
             logging.warning("Proxy pool initialization timed out after 30 seconds, continuing without proxies")
-            if console_level <= logging.INFO:
-                print(f"{C.YEL}⏰ Status: Proxy loading timed out, continuing without proxies{C.END}")
+            status_display.update_status("Proxy loading timed out, continuing without proxies")
             proxy_pool = None
         except Exception as e:
             logging.warning("Proxy pool initialisation failed, will rely on lazy/fallback: %s", e)
-            if console_level <= logging.INFO:
-                print(f"{C.RED}❌ Status: Proxy loading failed - %s{C.END}", str(e))
+            status_display.update_status(f"Proxy loading failed - {str(e)}")
             proxy_pool = None
     elif args.public_proxy and not ProxyPool:
         logging.error("SwiftShadow not available; --public-proxy ignored.")
@@ -516,8 +519,7 @@ async def _main() -> None:
         )
         if not ok_probe:
             msg = "Current IP appears blocked"
-            if progress:
-                progress.stop()
+            status_display.stop()
             print(msg)
             logging.error(msg)
             sys.exit(2)
@@ -556,10 +558,8 @@ async def _main() -> None:
                 delay=args.sleep,
             )
         )
-    if progress and bar_task is not None:
-        progress.update(
-            bar_task, description="Downloading", completed=0, total=len(tasks)
-        )
+    status_display.update_status("Downloading transcripts...")
+    status_display.update_downloads(0, len(tasks))
     
     if console_level <= logging.INFO:
         concurrent_info = f"Concurrent Jobs: {args.jobs}"
@@ -574,19 +574,18 @@ async def _main() -> None:
         print(f"{C.BLU}⬇️ Status: Downloading transcripts... | {concurrent_info}{proxy_info}{C.END}")
     if not tasks and not skipped and not pre_results:
         logging.info("Nothing to do (all files already present).")
-        if progress:
-            progress.stop()
+        status_display.stop()
         return
     orig_console_level = console_handler.level
     console_handler.setLevel(logging.ERROR)
     try:
         results = []
+        completed_count = 0
         for fut in asyncio.as_completed(tasks):
             results.append(await fut)
-            if progress and bar_task is not None:
-                progress.update(bar_task, advance=1)
-        if progress:
-            progress.stop()
+            completed_count += 1
+            status_display.update_downloads(completed_count)
+        status_display.stop()
     finally:
         console_handler.setLevel(orig_console_level)
         for h in logging.getLogger().handlers:
@@ -609,22 +608,25 @@ async def _main() -> None:
         
         # Log to file (without emojis) - plain text for log parsing
         if none:
+            none_limited = none[:args.summary_max_no_captions]
             logging.info(
                 "Videos without captions (%d): %s",
                 len(none),
-                ", ".join(f"https://youtu.be/{vid}" for _, vid, _ in none),
+                ", ".join(f"https://youtu.be/{vid}" for _, vid, _ in none_limited),
             )
         if fail:
+            fail_limited = fail[:args.summary_max_failed]
             logging.info(
                 "Videos failed (%d): %s",
                 len(fail),
-                ", ".join(f"https://youtu.be/{vid}" for _, vid, _ in fail),
+                ", ".join(f"https://youtu.be/{vid}" for _, vid, _ in fail_limited),
             )
         if proxy_fail:
+            proxy_fail_limited = proxy_fail[:args.summary_max_failed]
             logging.info(
                 "Videos failed due to proxy/network (%d): %s",
                 len(proxy_fail),
-                ", ".join(f"https://youtu.be/{vid}" for _, vid, _ in proxy_fail),
+                ", ".join(f"https://youtu.be/{vid}" for _, vid, _ in proxy_fail_limited),
             )
         logging.info(
             "Summary: ok=%d  no_caption=%d  failed=%d  proxy_failed=%d  banned_proxies=%d  total=%d",
@@ -636,10 +638,11 @@ async def _main() -> None:
             total,
         )
         if banned_proxies:
+            banned_limited = list(sorted(banned_proxies))[:args.summary_max_proxies]
             logging.info(
                 "Banned proxies (%d): %s",
                 len(banned_proxies),
-                ", ".join(sorted(banned_proxies)),
+                ", ".join(banned_limited),
             )
         
         # Print to console (with emojis) - completely separate from logging
@@ -647,17 +650,38 @@ async def _main() -> None:
         if console_level <= logging.INFO:
             print()  # Add spacing before summary
             if none:
-                print(f"{C.YEL}❌ Videos without captions ({len(none)}): {', '.join(f'https://youtu.be/{vid}' for _, vid, _ in none)}{C.END}")
+                none_limited = none[:args.summary_max_no_captions]
+                print(f"{C.YEL}Videos without captions:{C.END}")
+                for _, vid, title in none_limited:
+                    print(f"{C.YEL}• https://youtu.be/{vid} — {title[:70]}{C.END}")
+                if len(none) > args.summary_max_no_captions:
+                    print(f"{C.YEL}• ...and {len(none) - args.summary_max_no_captions} more{C.END}")
             if fail:
-                print(f"{C.RED}⚠️ Videos failed ({len(fail)}): {', '.join(f'https://youtu.be/{vid}' for _, vid, _ in fail)}{C.END}")
+                fail_limited = fail[:args.summary_max_failed]
+                print(f"{C.RED}Videos transcripts that failed to download:{C.END}")
+                for _, vid, title in fail_limited:
+                    print(f"{C.RED}• https://youtu.be/{vid} — {title[:70]}{C.END}")
+                if len(fail) > args.summary_max_failed:
+                    print(f"{C.RED}• ...and {len(fail) - args.summary_max_failed} more{C.END}")
             if proxy_fail:
-                print(f"{C.RED}🌐 Videos failed due to proxy/network ({len(proxy_fail)}): {', '.join(f'https://youtu.be/{vid}' for _, vid, _ in proxy_fail)}{C.END}")
-            
-            # Console summary with emojis - more visually appealing
-            print(f"📊 Summary: ✅ {C.GRN}{len(ok)}{C.END}  ❌ no-caption {C.YEL}{len(none)}{C.END}  ⚠️ failed {C.RED}{len(fail)}{C.END}  🌐 proxy-failed {C.RED}{len(proxy_fail)}{C.END}  🚫 banned {C.RED}{len(banned_proxies)}{C.END}  (total {total})")
+                proxy_fail_limited = proxy_fail[:args.summary_max_failed]
+                print(f"{C.RED}Videos failed due to proxy/network:{C.END}")
+                for _, vid, title in proxy_fail_limited:
+                    print(f"{C.RED}• https://youtu.be/{vid} — {title[:70]}{C.END}")
+                if len(proxy_fail) > args.summary_max_failed:
+                    print(f"{C.RED}• ...and {len(proxy_fail) - args.summary_max_failed} more{C.END}")
             
             if banned_proxies:
-                print(f"{C.RED}🚫 Banned proxies ({len(banned_proxies)}): {', '.join(sorted(banned_proxies))}{C.END}")
+                banned_limited = list(sorted(banned_proxies))[:args.summary_max_proxies]
+                print(f"{C.RED}Proxies Used:{C.END}")
+                for proxy in banned_limited:
+                    print(f"{C.RED}• {proxy}{C.END}")
+                if len(banned_proxies) > args.summary_max_proxies:
+                    print(f"{C.RED}• ...and {len(banned_proxies) - args.summary_max_proxies} more{C.END}")
+            
+            # Console summary with emojis - more visually appealing
+            total_failed = len(fail) + len(proxy_fail)
+            print(f"Summary: ✓ {C.GRN}{len(ok)}{C.END}   •  ↯ no-caption {C.YEL}{len(none)}{C.END}   •  ⚠ failed {C.RED}{total_failed}{C.END}   🚫 proxies banned {C.RED}{len(banned_proxies)}{C.END}   (total {total})")
             print()  # Add spacing after summary
 
     stats_files: list[Path] = []
@@ -834,12 +858,14 @@ async def _main() -> None:
             key=lambda p: _stats(p.read_text(encoding="utf-8", errors="ignore"))[2],
             reverse=True,
         )
-        if args.stats_top:
-            ranked = ranked[: args.stats_top]
+        # Use new flag with fallback to old flag for backward compatibility
+        stats_limit = args.summary_stats_top or args.stats_top
+        if stats_limit:
+            ranked = ranked[: stats_limit]
         header_txt = "File statistics:"
         if len(ranked) == 1:
             header_txt = "File statistics (top 1):"
-        elif args.stats_top and args.stats_top < len(stats_files):
+        elif stats_limit and stats_limit < len(stats_files):
             header_txt = f"File statistics (top {len(ranked)})"
         print(f"{C.BLU}📄 {header_txt}{C.END}")
         pad = len(str(len(ranked))) or 1
@@ -857,13 +883,34 @@ async def _main() -> None:
         print(f"📝 Full log: {C.BLU}{log_file}{C.END}")
     
     try:
+        # Clean up proxy pool if it exists
         if proxy_pool and hasattr(proxy_pool, "close"):
-            proxy_pool.close()
+            try:
+                proxy_pool.close()
+            except Exception:
+                pass  # Ignore cleanup errors
+        
+        # Clean up status display
+        if status_display:
+            try:
+                status_display.stop()
+            except Exception:
+                pass  # Ignore cleanup errors
+                
     finally:
-        _emit_final_summary()
-        for h in logging.getLogger().handlers:
-            h.flush()
-        logging.shutdown()
+        try:
+            _emit_final_summary()
+        except Exception as e:
+            logging.error("Error generating final summary: %s", e)
+        
+        # Flush and shutdown logging
+        try:
+            for h in logging.getLogger().handlers:
+                if hasattr(h, 'flush'):
+                    h.flush()
+            logging.shutdown()
+        except Exception:
+            pass  # Ignore logging cleanup errors
     if fail:
         sys.exit(2)
 
@@ -876,21 +923,42 @@ async def main() -> None:
     try:
         await _main()
     except KeyboardInterrupt:
-        logging.warning("Interrupted by user")
-        print(f"\n{C.BLU}Aborted by user{C.END}")
+        try:
+            logging.warning("Interrupted by user")
+            print(f"\n{C.BLU}Aborted by user{C.END}")
+        except Exception:
+            pass  # Ignore errors during interrupt handling
         sys.exit(130)
+    except Exception as e:
+        try:
+            logging.error("Unexpected error: %s", e)
+            print(f"\n{C.RED}Error: {e}{C.END}")
+        except Exception:
+            pass  # Ignore errors during error handling
+        sys.exit(1)
 
 
 def cli_entry():
     if sys.platform.startswith("linux"):
         try:
             import uvloop
-
             uvloop.install()
-        except ModuleNotFoundError:
-            pass
+        except (ModuleNotFoundError, ImportError):
+            pass  # uvloop is optional
+        except Exception:
+            pass  # Ignore uvloop installation errors
+    
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print(f"\n{C.BLU}Aborted by user{C.END}")
+        try:
+            print(f"\n{C.BLU}Aborted by user{C.END}")
+        except Exception:
+            pass  # Ignore errors during interrupt handling
         sys.exit(130)
+    except Exception as e:
+        try:
+            print(f"\n{C.RED}Fatal error: {e}{C.END}")
+        except Exception:
+            pass  # Ignore errors during error handling
+        sys.exit(1)

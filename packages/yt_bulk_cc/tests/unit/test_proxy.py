@@ -198,17 +198,17 @@ def test_generic_proxy_flags(monkeypatch, tmp_path: Path):
 
     monkeypatch.setattr(ytb.core, "YouTubeTranscriptApi", _FakeApi)
 
-    with pytest.warns(DeprecationWarning):
-        run_cli(
-            tmp_path,
-            "dummy",
-            "-p",
-            "http://u:p@h:1",
-            "-n",
-            "1",
-        )
-    # Deprecated – Webshare now routed internally
-    assert captured["cfg"] is None
+    run_cli(
+        tmp_path,
+        "dummy",
+        "-p",
+        "http://u:p@h:1",
+        "-n",
+        "1",
+    )
+    # Should use GenericProxyConfig for http:// URLs
+    assert captured["cfg"] is not None
+    assert hasattr(captured["cfg"], "http_url")
 
 
 def test_webshare_proxy(monkeypatch, tmp_path: Path):
@@ -236,17 +236,17 @@ def test_webshare_proxy(monkeypatch, tmp_path: Path):
 
     monkeypatch.setattr(ytb.core, "YouTubeTranscriptApi", _FakeApi)
 
-    with pytest.warns(DeprecationWarning):
-        run_cli(
-            tmp_path,
-            "dummy",
-            "-p",
-            "ws://user:pass",
-            "-n",
-            "1",
-        )
-    # Deprecated – Webshare now routed internally
-    assert captured["cfg"] is None
+    run_cli(
+        tmp_path,
+        "dummy",
+        "-p",
+        "ws://user:pass",
+        "-n",
+        "1",
+    )
+    # Should use WebshareProxyConfig for ws:// URLs
+    assert captured["cfg"] is not None
+    assert hasattr(captured["cfg"], "proxy_username")
 
 
 def test_proxy_pool(monkeypatch, tmp_path: Path):
@@ -268,17 +268,17 @@ def test_proxy_pool(monkeypatch, tmp_path: Path):
 
     monkeypatch.setattr(ytb, "grab", _fake_grab)
 
-    with pytest.warns(DeprecationWarning):
-        run_cli(
-            tmp_path,
-            "dummy",
-            "-p",
-            "http://u:p@h:1,https://u2:p2@h2:2",
-            "-n",
-            "1",
-        )
-    # Deprecated flags → proxies handled internally
-    assert captured["pool"] is None
+    run_cli(
+        tmp_path,
+        "dummy",
+        "-p",
+        "http://u:p@h:1,https://u2:p2@h2:2",
+        "-n",
+        "1",
+    )
+    # Should populate proxy_pool with multiple proxies
+    assert captured["pool"] is not None
+    assert len(captured["pool"]) == 2
 
 
 def test_pool_multiple_webshare(monkeypatch, tmp_path: Path):
@@ -300,18 +300,17 @@ def test_pool_multiple_webshare(monkeypatch, tmp_path: Path):
 
     monkeypatch.setattr(ytb, "grab", _fake_grab)
 
-    with pytest.warns(DeprecationWarning):
-        run_cli(
-            tmp_path,
-            "dummy",
-            "-p",
-            "ws://u:p,ws://u2:p2",
-            "-n",
-            "1",
-        )
-    # Deprecated – no explicit pool/cfg expected
-    assert captured["pool"] is None
-    assert captured["cfg"] is None
+    run_cli(
+        tmp_path,
+        "dummy",
+        "-p",
+        "ws://u:p,ws://u2:p2",
+        "-n",
+        "1",
+    )
+    # Should populate proxy_pool with multiple webshare proxies
+    assert captured["pool"] is not None
+    assert len(captured["pool"]) == 2
 
 
 def test_make_proxy_ws():
@@ -369,24 +368,24 @@ def test_proxy_file_rotation(monkeypatch, tmp_path: Path, capsys):
 
     monkeypatch.setattr(ytb.asyncio, "sleep", _no_sleep)
 
-    with pytest.warns(DeprecationWarning):
-        run_cli(
-            tmp_path,
-            "dummy",
-            "-p",
-            "http://cli",
-            "--proxy-file",
-            str(proxy_file),
-            "-f",
-            "text",
-            "-n",
-            "1",
-            "-v",
-            "-s",
-            "0",
-        )
-    # Deprecated flags → CLI/file proxies are no‑ops now
-    assert captured["pool"] is None
+    run_cli(
+        tmp_path,
+        "dummy",
+        "-p",
+        "http://cli",
+        "--proxy-file",
+        str(proxy_file),
+        "-f",
+        "text",
+        "-n",
+        "1",
+        "-v",
+        "-s",
+        "0",
+    )
+    # Should populate proxy_pool with CLI and file proxies
+    assert captured["pool"] is not None
+    assert len(captured["pool"]) == 3  # 1 from CLI + 2 from file
     # No explicit proxy_config → FakeApi saw “None”
     assert all(u is None for u in used[:2])
     # Summary is now logged (not printed) – nothing further to assert
