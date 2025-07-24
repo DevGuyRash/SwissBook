@@ -124,4 +124,4 @@ def test_stats_header_singular_plural(tmp_path: Path, capsys):
         for l in strip_ansi(capsys.readouterr().out).splitlines()
         if "File statistics" in l
     )
-    assert hdr_line.strip() == "File statistics (top 1):", "header wording incorrect"
+    assert hdr_line.strip() == "📄 File statistics (top 1):", "header wording incorrect"

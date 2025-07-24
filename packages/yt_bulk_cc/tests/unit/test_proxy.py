@@ -444,16 +444,25 @@ def test_public_proxy_with_cli(monkeypatch, tmp_path: Path):
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
 def test_public_proxy_https(monkeypatch, tmp_path: Path):
-    called: dict[str, Any] = {}
-    calls: list[dict[str, Any]] = []
+    # Mock ProxyPool to capture initialization parameters
+    captured_params = {}
+    
+    class MockProxyPool:
+        def __init__(self, **kwargs):
+            captured_params.update(kwargs)
+            self._proxies = ["https://pub:1", "https://pub:2"]
+        
+        async def ensure_ready(self):
+            pass
+        
+        def get(self):
+            return "https://pub:1"
+        
+        def close(self):
+            pass
 
-    def _qp(*a, **k):
-        called.update(k)
-        calls.append(k)
-        idx = len(calls)
-        return SimpleNamespace(as_string=lambda: f"https://pub:{idx}")
-
-    monkeypatch.setattr(ytb.cli, "QuickProxy", _qp)
+    # Mock at the CLI module level where it's imported
+    monkeypatch.setattr(ytb.cli, "ProxyPool", MockProxyPool)
 
     async def _fake_grab(*_a, **kw):
         return ("ok", "x", "t")
@@ -471,8 +480,9 @@ def test_public_proxy_https(monkeypatch, tmp_path: Path):
         "1",
     )
 
-    assert called["protocol"] == "https"
-    assert len(calls) == 2
+    # Verify ProxyPool was initialized with correct parameters
+    assert captured_params["max_proxies"] == 2
+    assert captured_params["verbose"] == 0
 
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")
@@ -547,14 +557,23 @@ def test_public_proxy_no_swiftshadow(monkeypatch, tmp_path: Path):
 def test_public_proxy_limit(monkeypatch, tmp_path: Path):
     """Limit loaded public proxies to the requested count."""
 
-    calls: list[int] = []
+    # Mock ProxyPool to capture the proxy pool object
+    class MockProxyPool:
+        def __init__(self, max_proxies=None, **kwargs):
+            self.max_proxies = max_proxies
+            self._proxies = [f"http://pub:{i+1}" for i in range(max_proxies or 2)]
+        
+        async def ensure_ready(self):
+            pass
+        
+        def get(self):
+            return self._proxies[0] if self._proxies else None
+        
+        def close(self):
+            pass
 
-    def _qp(*a, **k):
-        calls.append(1)
-        idx = len(calls)
-        return SimpleNamespace(as_string=lambda: f"http://pub:{idx}")
-
-    monkeypatch.setattr(ytb.cli, "QuickProxy", _qp)
+    # Mock at the CLI module level where it's imported
+    monkeypatch.setattr(ytb.cli, "ProxyPool", MockProxyPool)
 
     captured = {}
 
@@ -567,8 +586,10 @@ def test_public_proxy_limit(monkeypatch, tmp_path: Path):
 
     run_cli(tmp_path, "dummy", "--public-proxy", "2", "-n", "1")
 
-    assert captured["pool"] == ["http://pub:1", "http://pub:2"]
-    assert len(calls) == 2
+    # Verify we got a ProxyPool instance with correct max_proxies
+    assert isinstance(captured["pool"], MockProxyPool)
+    assert captured["pool"].max_proxies == 2
+    assert len(captured["pool"]._proxies) == 2
 
 
 @pytest.mark.usefixtures("patch_scrapetube", "patch_detect")

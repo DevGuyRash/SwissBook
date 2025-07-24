@@ -83,12 +83,13 @@ class ColorFormatter(logging.Formatter):
         if rec.levelno >= logging.WARNING:
             rec.msg = f"{color}{rec.getMessage()}{C.END}"
             rec.args = ()
-        if rec.msg.startswith("Summary:") and len(rec.args) == 5:
-            ok, none, fail, banned, total = rec.args
+        if rec.msg.startswith("Summary:") and len(rec.args) == 6:
+            ok, none, fail, proxy_fail, banned, total = rec.args
             rec.msg = (
                 f"Summary: ✓ {C.GRN}{ok}{C.END}   •  "
                 f"↯ no-caption {C.YEL}{none}{C.END}   •  "
                 f"⚠ failed {C.RED}{fail}{C.END}   "
+                f"🌐 proxy-failed {C.RED}{proxy_fail}{C.END}   "
                 f"🚫 banned {C.RED}{banned}{C.END}   "
                 f"(total {total})"
             )
@@ -332,7 +333,11 @@ async def _main() -> None:
         log_file.parent.mkdir(parents=True, exist_ok=True)
         _ANSI_RE = re.compile(r"\x1B\[[0-9;]*[A-Za-z]")
 
-        class _Tee:
+        # Only redirect stderr to capture error output, not stdout
+        fh = log_file.open("w", encoding="utf-8")
+        _orig_err = sys.stderr
+        
+        class _StderrTee:
             def __init__(self, console_stream, file_stream):
                 self._console = console_stream
                 self._file = file_stream
@@ -346,13 +351,10 @@ async def _main() -> None:
                 self._console.flush()
                 self._file.flush()
 
-        fh = log_file.open("w", encoding="utf-8")
-        _orig_out, _orig_err = sys.stdout, sys.stderr
-        sys.stdout = _Tee(_orig_out, fh)
-        sys.stderr = _Tee(_orig_err, fh)
+        sys.stderr = _StderrTee(_orig_err, fh)
 
         def _restore_streams():
-            sys.stdout, sys.stderr = _orig_out, _orig_err
+            sys.stderr = _orig_err
             fh.close()
 
         atexit.register(_restore_streams)
@@ -379,16 +381,26 @@ async def _main() -> None:
         level=root_logger_level,
         handlers=[console_handler] + ([file_handler] if file_handler else []),
     )
-    # ── Swiftshadow logging integration ─────────────────────────────────────
+    # ── SwiftShadow logging integration ─────────────────────────────────────
     swift_log = logging.getLogger("swiftshadow")
     swift_log.setLevel(logging.DEBUG if args.verbose > 1 else logging.INFO)
-    # Ensure all swiftshadow records land in *our* handlers (file + console)
+    # Ensure all SwiftShadow records land in *our* handlers (file + console)
     swift_log.propagate = True
-    # Strip stray handlers the lib might have added (avoid dupes)
-    for _h in list(swift_log.handlers):
-        swift_log.removeHandler(_h)
-    for h in logging.getLogger().handlers:
-        swift_log.addHandler(h)
+    # Clear any existing handlers to avoid duplicates
+    swift_log.handlers.clear()
+    # Add our handlers to SwiftShadow logger
+    if file_handler:
+        swift_log.addHandler(file_handler)
+    swift_log.addHandler(console_handler)
+    
+    # Also ensure site_downloader logs are captured
+    site_log = logging.getLogger("site_downloader")
+    site_log.setLevel(logging.DEBUG if args.verbose > 1 else logging.INFO)
+    site_log.propagate = True
+    site_log.handlers.clear()
+    if file_handler:
+        site_log.addHandler(file_handler)
+    site_log.addHandler(console_handler)
     if args.timestamps:
         FMT["text"] = TimeStampedText(show=True)
         FMT["pretty"] = TimeStampedText(show=True)
@@ -407,6 +419,7 @@ async def _main() -> None:
     logging.info("Found %s videos", len(videos))
     progress = None
     bar_task = None
+    status_display = None
     try:
         from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 
@@ -418,6 +431,7 @@ async def _main() -> None:
         )
         progress.start()
         bar_task = progress.add_task("Preparing", total=len(videos))
+        
     except ModuleNotFoundError:  # pragma: no cover - rich optional
         pass
     proxy_pool = None
@@ -435,6 +449,9 @@ async def _main() -> None:
             stacklevel=0,
         )
     if args.public_proxy and ProxyPool:
+        if console_level <= logging.INFO:
+            print(f"{C.BLU}🔄 Status: Loading proxies...{C.END}")
+        
         enable_bg = args.proxy_refresh > 0
         proxy_pool = ProxyPool(
             max_proxies=args.public_proxy,
@@ -443,14 +460,40 @@ async def _main() -> None:
             enable_background_refresh=enable_bg,
             refresh_interval_minutes=args.proxy_refresh if enable_bg else None,
         )
-        # Await initial population so first requests have proxies – safe no-op outside loop.
+        # Await initial population with timeout to prevent hanging
         try:
             if hasattr(proxy_pool, "ensure_ready"):
-                await proxy_pool.ensure_ready()
+                await asyncio.wait_for(proxy_pool.ensure_ready(), timeout=30.0)
+            
+            # Show proxy info
+            if console_level <= logging.INFO and hasattr(proxy_pool, '_proxies'):
+                proxy_count = len(getattr(proxy_pool, '_proxies', []))
+                print(f"{C.GRN}✅ Status: Ready - {proxy_count} proxies loaded{C.END}")
+                if args.verbose >= 1:
+                    proxy_list = []
+                    for i, proxy in enumerate(getattr(proxy_pool, '_proxies', [])[:5]):  # Show first 5
+                        proxy_list.append(f"  - {proxy}")
+                    if proxy_count > 5:
+                        proxy_list.append(f"  ... and {proxy_count - 5} more")
+                    
+                    if proxy_list:
+                        print(f"{C.YEL}🌐 Proxies used:{C.END}")
+                        print("\n".join(proxy_list))
+                
+        except asyncio.TimeoutError:
+            logging.warning("Proxy pool initialization timed out after 30 seconds, continuing without proxies")
+            if console_level <= logging.INFO:
+                print(f"{C.YEL}⏰ Status: Proxy loading timed out, continuing without proxies{C.END}")
+            proxy_pool = None
         except Exception as e:
             logging.warning("Proxy pool initialisation failed, will rely on lazy/fallback: %s", e)
+            if console_level <= logging.INFO:
+                print(f"{C.RED}❌ Status: Proxy loading failed - %s{C.END}", str(e))
+            proxy_pool = None
     elif args.public_proxy and not ProxyPool:
         logging.error("SwiftShadow not available; --public-proxy ignored.")
+        if console_level <= logging.INFO:
+            print(f"{C.RED}❌ Status: SwiftShadow unavailable{C.END}")
     cookies_data: list | None = None
     if args.cookie_json:
         try:
@@ -517,6 +560,18 @@ async def _main() -> None:
         progress.update(
             bar_task, description="Downloading", completed=0, total=len(tasks)
         )
+    
+    if console_level <= logging.INFO:
+        concurrent_info = f"Concurrent Jobs: {args.jobs}"
+        if proxy_pool and hasattr(proxy_pool, '_proxies'):
+            proxy_count = len(getattr(proxy_pool, '_proxies', []))
+            proxy_info = f" | 🌐 Proxies: {proxy_count} loaded"
+        elif proxy_pool:
+            proxy_info = " | 🌐 Proxies: Active"
+        else:
+            proxy_info = ""
+            
+        print(f"{C.BLU}⬇️ Status: Downloading transcripts... | {concurrent_info}{proxy_info}{C.END}")
     if not tasks and not skipped and not pre_results:
         logging.info("Nothing to do (all files already present).")
         if progress:
@@ -551,6 +606,8 @@ async def _main() -> None:
 
     def _emit_final_summary() -> None:
         total = len(ok) + len(none) + len(fail) + len(proxy_fail)
+        
+        # Log to file (without emojis) - plain text for log parsing
         if none:
             logging.info(
                 "Videos without captions (%d): %s",
@@ -584,6 +641,24 @@ async def _main() -> None:
                 len(banned_proxies),
                 ", ".join(sorted(banned_proxies)),
             )
+        
+        # Print to console (with emojis) - completely separate from logging
+        # Only print if console level allows it
+        if console_level <= logging.INFO:
+            print()  # Add spacing before summary
+            if none:
+                print(f"{C.YEL}❌ Videos without captions ({len(none)}): {', '.join(f'https://youtu.be/{vid}' for _, vid, _ in none)}{C.END}")
+            if fail:
+                print(f"{C.RED}⚠️ Videos failed ({len(fail)}): {', '.join(f'https://youtu.be/{vid}' for _, vid, _ in fail)}{C.END}")
+            if proxy_fail:
+                print(f"{C.RED}🌐 Videos failed due to proxy/network ({len(proxy_fail)}): {', '.join(f'https://youtu.be/{vid}' for _, vid, _ in proxy_fail)}{C.END}")
+            
+            # Console summary with emojis - more visually appealing
+            print(f"📊 Summary: ✅ {C.GRN}{len(ok)}{C.END}  ❌ no-caption {C.YEL}{len(none)}{C.END}  ⚠️ failed {C.RED}{len(fail)}{C.END}  🌐 proxy-failed {C.RED}{len(proxy_fail)}{C.END}  🚫 banned {C.RED}{len(banned_proxies)}{C.END}  (total {total})")
+            
+            if banned_proxies:
+                print(f"{C.RED}🚫 Banned proxies ({len(banned_proxies)}): {', '.join(sorted(banned_proxies))}{C.END}")
+            print()  # Add spacing after summary
 
     stats_files: list[Path] = []
     _seen_stats: set[Path] = set()
@@ -740,9 +815,9 @@ async def _main() -> None:
             logging.info(
                 "Concatenated output → %s", ", ".join(p.name for p in concat_paths)
             )
-        print(f"\n{C.GRN}✅  Concatenated transcripts saved to:{C.END}")
+        print(f"\n{C.GRN}✅ Concatenated transcripts saved to:{C.END}")
         for p in concat_paths:
-            print(f"   {p}")
+            print(f"   📄 {p}")
         print()
     if not args.concat:
         for _, vid, title in ok:
@@ -766,7 +841,7 @@ async def _main() -> None:
             header_txt = "File statistics (top 1):"
         elif args.stats_top and args.stats_top < len(stats_files):
             header_txt = f"File statistics (top {len(ranked)})"
-        print(f"{C.BLU}{header_txt}{C.END}")
+        print(f"{C.BLU}📄 {header_txt}{C.END}")
         pad = len(str(len(ranked))) or 1
         for idx, p in enumerate(ranked, 1):
             try:
@@ -778,8 +853,8 @@ async def _main() -> None:
                 f"  {idx:0{pad}d}. {p.name} - {C.GRN}{w:,}{C.END} w · {C.GRN}{l:,}{C.END} l · {C.GRN}{c:,}{C.END} c"
             )
         print()
-    if args.concat and log_file:
-        print(f"📝  Full log: {C.BLU}{log_file}{C.END}\n")
+    if log_file and console_level <= logging.INFO:
+        print(f"📝 Full log: {C.BLU}{log_file}{C.END}")
     
     try:
         if proxy_pool and hasattr(proxy_pool, "close"):
