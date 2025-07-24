@@ -486,13 +486,11 @@ async def _main() -> None:
                 status_display.update_status(f"Ready - {len(proxy_list)} proxies loaded")
                 
         except asyncio.TimeoutError:
-            logging.warning("Proxy pool initialization timed out after 30 seconds, continuing without proxies")
-            status_display.update_status("Proxy loading timed out, continuing without proxies")
-            proxy_pool = None
+            logging.warning("Proxy pool initialization timed out after 30 seconds; continuing with pool")
+            status_display.update_status("Proxy loading timed out; continuing")
         except Exception as e:
             logging.warning("Proxy pool initialisation failed, will rely on lazy/fallback: %s", e)
             status_display.update_status(f"Proxy loading failed - {str(e)}")
-            proxy_pool = None
     elif args.public_proxy and not ProxyPool:
         logging.error("SwiftShadow not available; --public-proxy ignored.")
         if console_level <= logging.INFO:
@@ -507,6 +505,7 @@ async def _main() -> None:
             sys.exit(1)
     pre_results: list[tuple[str, str, str]] = []
     banned_proxies: set[str] = set()
+    proxies_used: set[str] = set()
 
     if args.check_ip:
         first_vid = videos[0]["videoId"]
@@ -554,6 +553,7 @@ async def _main() -> None:
                 proxy_pool=proxy_pool,
                 proxy_cfg=proxy_cfg,
                 banned=banned_proxies,
+                used=proxies_used,
                 include_stats=args.stats and not args.concat,
                 delay=args.sleep,
             )
@@ -637,6 +637,13 @@ async def _main() -> None:
             len(banned_proxies),
             total,
         )
+        if proxies_used:
+            used_limited = list(sorted(proxies_used))[:args.summary_max_proxies]
+            logging.info(
+                "Proxies used (%d): %s",
+                len(proxies_used),
+                ", ".join(used_limited),
+            )
         if banned_proxies:
             banned_limited = list(sorted(banned_proxies))[:args.summary_max_proxies]
             logging.info(
@@ -671,13 +678,13 @@ async def _main() -> None:
                 if len(proxy_fail) > args.summary_max_failed:
                     print(f"{C.RED}• ...and {len(proxy_fail) - args.summary_max_failed} more{C.END}")
             
-            if banned_proxies:
-                banned_limited = list(sorted(banned_proxies))[:args.summary_max_proxies]
+            if proxies_used:
+                used_limited = list(sorted(proxies_used))[:args.summary_max_proxies]
                 print(f"{C.RED}Proxies Used:{C.END}")
-                for proxy in banned_limited:
+                for proxy in used_limited:
                     print(f"{C.RED}• {proxy}{C.END}")
-                if len(banned_proxies) > args.summary_max_proxies:
-                    print(f"{C.RED}• ...and {len(banned_proxies) - args.summary_max_proxies} more{C.END}")
+                if len(proxies_used) > args.summary_max_proxies:
+                    print(f"{C.RED}• ...and {len(proxies_used) - args.summary_max_proxies} more{C.END}")
             
             # Console summary with emojis - more visually appealing
             total_failed = len(fail) + len(proxy_fail)

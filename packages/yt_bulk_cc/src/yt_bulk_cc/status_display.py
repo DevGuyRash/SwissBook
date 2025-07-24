@@ -154,11 +154,18 @@ class StatusDisplay:
             content = [table]
             if self.progress and self.progress_task is not None:
                 content.append(self.progress)
-            
+
+            try:
+                from rich.console import Group
+
+                renderable = Group(*content)
+            except Exception:
+                renderable = "\n".join(str(item) for item in content)
+
             return Panel(
-                "\n".join(str(item) for item in content),
+                renderable,
                 title="[bold blue]Download Status[/bold blue]",
-                border_style="blue"
+                border_style="blue",
             )
             
         except Exception as e:
