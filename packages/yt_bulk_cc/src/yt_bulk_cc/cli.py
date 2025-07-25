@@ -97,11 +97,103 @@ class ColorFormatter(logging.Formatter):
         return super().format(rec)
 
 
+async def initialize_proxy_pool(args, status_display):
+    """Initialize proxy pool with proper timeout and error handling."""
+    status_display.update_status("🌐 Loading public proxies...")
+    
+    try:
+        # Use SwiftShadow's recommended approach with proper timeout
+        enable_bg = args.proxy_refresh > 0
+        proxy_pool = ProxyPool(
+            max_proxies=args.public_proxy,
+            cache_minutes=10,
+            verbose=args.verbose >= 2,  # Only enable verbose for debug level
+            enable_background_refresh=enable_bg,
+            refresh_interval_minutes=args.proxy_refresh if enable_bg else None,
+        )
+        
+        # Wait for initial proxy population with timeout to prevent hanging
+        status_display.update_status("⏳ Validating proxies...")
+        
+        # Use a more aggressive timeout and proper error handling
+        try:
+            # Try to get at least one proxy to verify the pool is working
+            await asyncio.wait_for(
+                _wait_for_proxy_availability(proxy_pool, args.public_proxy), 
+                timeout=30.0
+            )
+            
+            # Update status display with actual proxy info
+            proxy_count = getattr(proxy_pool, '_proxy_count', args.public_proxy)
+            if hasattr(proxy_pool, '_proxies') and proxy_pool._proxies:
+                proxy_list = list(proxy_pool._proxies)[:10]  # Limit display
+                status_display.update_proxies(proxy_list)
+                status_display.update_proxy_pool_total(len(proxy_list))
+                status_display.update_active_proxy_count(0)  # No active downloads yet
+                logging.info("✅ Public proxy pool initialized with %d proxies", len(proxy_list))
+                status_display.update_status(f"✅ Ready - {len(proxy_list)} proxies loaded")
+            else:
+                # Fallback: assume some proxies are available
+                status_display.update_proxy_pool_total(min(proxy_count, args.public_proxy))
+                status_display.update_active_proxy_count(0)  # No active downloads yet
+                logging.info("✅ Public proxy pool initialized (lazy loading)")
+                status_display.update_status(f"✅ Ready - proxy pool initialized")
+                
+            return proxy_pool
+            
+        except asyncio.TimeoutError:
+            logging.warning("⏰ Proxy pool initialization timed out after 30 seconds")
+            status_display.update_proxy_pool_total(0)
+            status_display.update_active_proxy_count(0)
+            status_display.update_status("⏰ Proxy loading timed out - continuing without proxies")
+            return None
+            
+    except Exception as e:
+        logging.error("❌ Proxy pool initialization failed: %s", e)
+        status_display.update_proxy_pool_total(0)
+        status_display.update_active_proxy_count(0)
+        status_display.update_status(f"❌ Proxy loading failed - {str(e)}")
+        return None
+
+
+async def _wait_for_proxy_availability(proxy_pool, max_proxies):
+    """Wait for at least one proxy to become available."""
+    max_attempts = 10
+    for attempt in range(max_attempts):
+        try:
+            # Try to get a proxy to verify the pool is working
+            if hasattr(proxy_pool, 'get'):
+                test_proxy = proxy_pool.get()
+                if test_proxy:
+                    logging.debug("✅ Proxy pool validation successful")
+                    return
+            
+            # If no direct get method, check internal state
+            if hasattr(proxy_pool, '_proxies') and proxy_pool._proxies:
+                logging.debug("✅ Proxy pool has proxies available")
+                return
+                
+            # Wait a bit before retrying
+            await asyncio.sleep(1.0)
+            
+        except Exception as e:
+            logging.debug("Proxy availability check attempt %d failed: %s", attempt + 1, e)
+            if attempt < max_attempts - 1:
+                await asyncio.sleep(2.0)
+            else:
+                raise
+
+
 async def _main() -> None:
     # Suppress urllib3 connection cleanup errors during shutdown
     import warnings
     warnings.filterwarnings("ignore", message=".*Bad file descriptor.*", category=ResourceWarning)
     warnings.filterwarnings("ignore", message=".*unclosed.*", category=ResourceWarning)
+    warnings.filterwarnings("ignore", message=".*ClientProxyConnectionError.*", category=RuntimeWarning)
+    
+    # Also suppress SwiftShadow cleanup errors
+    import logging
+    logging.getLogger("swiftshadow").addFilter(lambda record: "Bad file descriptor" not in record.getMessage())
     class _ManFmt(
         argparse.ArgumentDefaultsHelpFormatter, argparse.RawTextHelpFormatter
     ):
@@ -379,6 +471,8 @@ async def _main() -> None:
     else:
         file_handler = None
     console_level = [logging.WARNING, logging.INFO, logging.DEBUG][min(args.verbose, 2)]
+    # For console output, only show CRITICAL when verbose=0, otherwise use normal levels
+    console_display_level = logging.CRITICAL if args.verbose == 0 else console_level
     term_console = Console(file=sys.__stdout__, force_terminal=True)
     console_handler = RichHandler(
         console=term_console,
@@ -387,7 +481,7 @@ async def _main() -> None:
         show_path=False,
         markup=False,
     )
-    console_handler.setLevel(console_level)
+    console_handler.setLevel(console_display_level)
     if file_handler:
         file_handler.setLevel(logging.DEBUG)
     root_logger_level = logging.DEBUG if file_handler else console_level
@@ -395,26 +489,32 @@ async def _main() -> None:
         level=root_logger_level,
         handlers=[console_handler] + ([file_handler] if file_handler else []),
     )
-    # ── SwiftShadow logging integration ─────────────────────────────────────
-    swift_log = logging.getLogger("swiftshadow")
-    swift_log.setLevel(logging.DEBUG if args.verbose > 1 else logging.INFO)
-    # Ensure all SwiftShadow records land in *our* handlers (file + console)
-    swift_log.propagate = True
-    # Clear any existing handlers to avoid duplicates
-    swift_log.handlers.clear()
-    # Add our handlers to SwiftShadow logger
-    if file_handler:
-        swift_log.addHandler(file_handler)
-    swift_log.addHandler(console_handler)
     
-    # Also ensure site_downloader logs are captured
-    site_log = logging.getLogger("site_downloader")
-    site_log.setLevel(logging.DEBUG if args.verbose > 1 else logging.INFO)
-    site_log.propagate = True
-    site_log.handlers.clear()
-    if file_handler:
-        site_log.addHandler(file_handler)
-    site_log.addHandler(console_handler)
+    # ── External library logging integration ─────────────────────────────────────
+    # Configure external library loggers to respect verbosity levels
+    # When verbose=0, only show ERROR+ messages in console; when verbose>=1, show all
+    external_console_level = console_display_level
+    
+    for logger_name in ["swiftshadow", "site_downloader"]:
+        ext_logger = logging.getLogger(logger_name)
+        ext_logger.setLevel(logging.DEBUG if args.verbose > 1 else logging.INFO)
+        ext_logger.propagate = True
+        ext_logger.handlers.clear()
+        
+        # Add file handler if available (always capture all levels to file)
+        if file_handler:
+            ext_logger.addHandler(file_handler)
+        
+        # Add console handler with appropriate level for external libraries
+        ext_console_handler = RichHandler(
+            console=term_console,
+            show_time=False,
+            show_level=True,
+            show_path=False,
+            markup=False,
+        )
+        ext_console_handler.setLevel(external_console_level)
+        ext_logger.addHandler(ext_console_handler)
     if args.timestamps:
         FMT["text"] = TimeStampedText(show=True)
         FMT["pretty"] = TimeStampedText(show=True)
@@ -471,45 +571,26 @@ async def _main() -> None:
         if len(proxies) == 1:
             proxy_cfg = _make_proxy(proxies[0])
             logging.info("Using single proxy: %s", proxies[0])
+            status_display.update_proxies(proxies)
+            status_display.update_proxy_pool_total(1)
+            status_display.update_active_proxy_count(0)  # No active downloads yet
             status_display.update_status("Custom proxy configured")
         else:
             proxy_pool = proxies
             logging.info("Using proxy pool with %d proxies", len(proxies))
             status_display.update_proxies(proxies)
+            status_display.update_proxy_pool_total(len(proxies))
+            status_display.update_active_proxy_count(0)  # No active downloads yet
             status_display.update_status(f"Proxy pool ready - {len(proxies)} proxies")
 
+    # Initialize public proxy pool with proper timeout and error handling
     if args.public_proxy and ProxyPool:
-        status_display.update_status("Loading public proxies...")
-        
-        enable_bg = args.proxy_refresh > 0
-        proxy_pool = ProxyPool(
-            max_proxies=args.public_proxy,
-            cache_minutes=10,
-            verbose=args.verbose,
-            enable_background_refresh=enable_bg,
-            refresh_interval_minutes=args.proxy_refresh if enable_bg else None,
-        )
-        # Await initial population with timeout to prevent hanging
-        try:
-            if hasattr(proxy_pool, "ensure_ready"):
-                await asyncio.wait_for(proxy_pool.ensure_ready(), timeout=30.0)
-            
-            # Update status display with proxy info
-            if hasattr(proxy_pool, '_proxies'):
-                proxy_list = getattr(proxy_pool, '_proxies', [])
-                status_display.update_proxies(proxy_list)
-                status_display.update_status(f"Ready - {len(proxy_list)} proxies loaded")
-                
-        except asyncio.TimeoutError:
-            logging.warning("Proxy pool initialization timed out after 30 seconds; continuing with pool")
-            status_display.update_status("Proxy loading timed out; continuing")
-        except Exception as e:
-            logging.warning("Proxy pool initialisation failed, will rely on lazy/fallback: %s", e)
-            status_display.update_status(f"Proxy loading failed - {str(e)}")
+        proxy_pool = await initialize_proxy_pool(args, status_display)
     elif args.public_proxy and not ProxyPool:
-        logging.error("SwiftShadow not available; --public-proxy ignored.")
+        logging.error("🚫 SwiftShadow not available; --public-proxy ignored.")
         if console_level <= logging.INFO:
             print(f"{C.RED}❌ Status: SwiftShadow unavailable{C.END}")
+        proxy_pool = None
     cookies_data: list | None = None
     if args.cookie_json:
         try:
@@ -571,6 +652,7 @@ async def _main() -> None:
                 used=proxies_used,
                 include_stats=args.stats and not args.concat,
                 delay=args.sleep,
+                status_display=status_display,
             )
         )
     status_display.update_status("Downloading transcripts...")
@@ -601,24 +683,44 @@ async def _main() -> None:
         fail_count = 0
         proxy_fail_count = 0
         status_display.update_counts(0, 0, 0, 0)
+        successful_count = 0
         for fut in asyncio.as_completed(tasks):
             res = await fut
             results.append(res)
             completed_count += 1
             code = res[0]
-            if code == "none":
+            if code == "ok":
+                successful_count += 1
+            elif code == "none":
                 no_caption_count += 1
             elif code == "fail":
                 fail_count += 1
             elif code == "proxy_fail":
                 proxy_fail_count += 1
             status_display.update_downloads(completed_count)
+            status_display.update_successful_downloads(successful_count)
             status_display.update_counts(
                 no_caption_count,
                 fail_count,
                 proxy_fail_count,
                 len(banned_proxies),
             )
+            
+            # Update proxy counts
+            try:
+                # Update active proxy count by subtracting banned proxies
+                if proxy_pool and hasattr(proxy_pool, '_proxies'):
+                    total_proxies = len(getattr(proxy_pool, '_proxies', []))
+                    active_count = max(0, total_proxies - len(banned_proxies))
+                    status_display.update_active_proxy_count(active_count)
+                elif proxies:  # Custom proxy list
+                    active_count = max(0, len(proxies) - len(banned_proxies))
+                    status_display.update_active_proxy_count(active_count)
+                
+                # Update proxies used count
+                status_display.update_proxies_used_count(len(proxies_used))
+            except Exception as e:
+                logging.debug("Error updating proxy counts: %s", e)
         status_display.update_status("Finished")
         status_display.stop()
     finally:
@@ -688,8 +790,8 @@ async def _main() -> None:
             )
         
         # Print to console (with emojis) - completely separate from logging
-        # Only print if console level allows it
-        if console_level <= logging.INFO:
+        # Always show final summary regardless of verbosity level
+        if True:  # Always show final summary
             print()  # Add spacing before summary
             if none:
                 none_limited = none[:args.summary_max_no_captions]
@@ -714,6 +816,7 @@ async def _main() -> None:
                     print(f"{C.RED}• ...and {len(proxy_fail) - args.summary_max_failed} more{C.END}")
             
             if proxies_used:
+                print()  # Add spacer before proxies used section
                 used_limited = list(sorted(proxies_used))[:args.summary_max_proxies]
                 print(f"{C.RED}Proxies Used:{C.END}")
                 for proxy in used_limited:
@@ -721,15 +824,21 @@ async def _main() -> None:
                 if len(proxies_used) > args.summary_max_proxies:
                     print(f"{C.RED}• ...and {len(proxies_used) - args.summary_max_proxies} more{C.END}")
             
+            # Add spacer before summary
+            print()
+            
+            # Summary header with color
+            print(f"{C.BLU}Summary{C.END}")
+            
             # Console summary with emojis - more visually appealing
             total_failed = len(fail) + len(proxy_fail)
             print(
-                f"Summary: ✓ {C.GRN}{len(ok)}{C.END}   •  ↯ no-caption {C.YEL}{len(none)}{C.END}   "
-                f"•  ⚠ failed {C.RED}{total_failed}{C.END}   "
-                f"🌐 proxies used {C.RED}{len(proxies_used)}{C.END}   "
+                f"✓ successful {C.GRN}{len(ok)}{C.END}   •  ↯ no-caption {C.YEL}{len(none)}{C.END}   "
+                f"•  ⚠ failed {C.RED}{total_failed}{C.END}   •  "
+                f"🌐 proxies used {C.RED}{len(proxies_used)}{C.END}   •  "
                 f"🚫 proxies banned {C.RED}{len(banned_proxies)}{C.END}   (total {total})"
             )
-            print(f"\U0001F4C1 Output Directory: {out_dir.resolve()}")
+            print(f"📁 Output Directory: {out_dir.resolve()}")
             print()  # Add spacing after summary
 
     stats_files: list[Path] = []

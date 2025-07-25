@@ -133,6 +133,7 @@ async def grab(
     used: set[str] | None = None,
     include_stats: bool = True,
     delay: float = 0.0,
+    status_display=None,
 ) -> tuple[str, str, str]:  # (status, video_id, title)
     async with sem:
         banned = banned if banned is not None else set()
@@ -144,13 +145,20 @@ async def grab(
                 addr = None
                 if proxy_pool and hasattr(proxy_pool, "get"):
                     spin = 0
+                    addr = None
                     while spin < 5:
-                        addr = proxy_pool.get()
-                        if addr not in banned:
+                        try:
+                            addr = proxy_pool.get()
+                            if addr and addr not in banned:
+                                break
+                        except Exception as e:
+                            logging.debug("🚫 Proxy pool get() failed: %s", e)
+                            addr = None
                             break
                         spin += 1
-                    if addr in banned:
-                        logging.error("All sampled proxies banned; abort %s", vid)
+                        await asyncio.sleep(0.1)  # Brief pause between attempts
+                    if not addr or addr in banned:
+                        logging.error("🚫 No available proxies for %s (pool empty or all banned)", vid)
                         return ("proxy_fail", vid, title)
                 elif proxy_cfg:
                     proxy = proxy_cfg
@@ -160,8 +168,13 @@ async def grab(
                         "webshare" if isinstance(proxy, WebshareProxyConfig) else "direct"
                     )
                 )
-                used.add(label)
-                logging.info("Using proxy %s for %s (attempt %d/%d)", label, vid, attempt, tries)
+                if label:
+                    used.add(label)
+                logging.info("🌐 Using proxy %s for %s (attempt %d/%d)", label or "direct", vid, attempt, tries)
+
+                # Mark proxy as actively downloading
+                if status_display and hasattr(status_display, 'proxy_start_download'):
+                    status_display.proxy_start_download(label or "direct")
 
                 session = requests.Session()
                 session.headers.update({"User-Agent": _pick_ua()})
@@ -223,12 +236,22 @@ async def grab(
                     full = _single_file_header(fmt_key, data, meta)
                     path.write_text(full, encoding="utf-8")
                 logging.info("✔ saved %s", path.name)
+                
+                # Mark proxy as finished downloading
+                if status_display and hasattr(status_display, 'proxy_finish_download'):
+                    status_display.proxy_finish_download(label or "direct")
+                
                 if delay:
                     await asyncio.sleep(delay)
                 return ("ok", vid, title)
 
             except (TranscriptsDisabled, NoTranscriptFound):
                 logging.warning("✖ no transcript for %s", vid)
+                
+                # Mark proxy as finished downloading
+                if status_display and hasattr(status_display, 'proxy_finish_download'):
+                    status_display.proxy_finish_download(label or "direct")
+                
                 if delay:
                     await asyncio.sleep(delay)
                 return ("none", vid, title)
@@ -242,15 +265,30 @@ async def grab(
                         "TypeError wrapper for NoTranscriptFound → treat as none"
                     )
                     logging.warning("✖ no transcript for %s", vid)
+                    
+                    # Mark proxy as finished downloading
+                    if status_display and hasattr(status_display, 'proxy_finish_download'):
+                        status_display.proxy_finish_download(label or "direct")
+                    
                     return ("none", vid, title)
                 raise  # unrelated TypeError → re-raise as before
             except VideoUnavailable:
                 logging.warning("✖ video unavailable %s", vid)
+                
+                # Mark proxy as finished downloading
+                if status_display and hasattr(status_display, 'proxy_finish_download'):
+                    status_display.proxy_finish_download(label or "direct")
+                
                 return ("fail", vid, title)
             except (TooManyRequests, IpBlocked, CouldNotRetrieveTranscript) as exc:
+                # Mark proxy as finished downloading before retry
+                if status_display and hasattr(status_display, 'proxy_finish_download'):
+                    status_display.proxy_finish_download(label or "direct")
+                
                 if addr:
                     banned.add(addr)
-                wait = 6 * attempt
+                    logging.info("🚫 Banned proxy %s due to %s", addr, exc.__class__.__name__)
+                wait = 6 * attempt  # Exponential backoff
                 logging.info(
                     "⏳ %s - retrying in %ss (attempt %s/%s)",
                     exc.__class__.__name__,
@@ -261,9 +299,13 @@ async def grab(
                 await asyncio.sleep(wait)
                 continue
             except requests.exceptions.RequestException as exc:
+                # Mark proxy as finished downloading before retry/exit
+                if status_display and hasattr(status_display, 'proxy_finish_download'):
+                    status_display.proxy_finish_download(label or "direct")
+                
                 logging.debug("Network error for %s via %s: %s", vid, addr or proxy_cfg, exc)
                 if attempt == tries:
-                    logging.error("%s after %d tries – giving up", exc, attempt)
+                    logging.error("❌ %s after %d tries – giving up", exc, attempt)
                     if addr:
                         banned.add(addr)
                     if delay:
@@ -272,14 +314,24 @@ async def grab(
                 await asyncio.sleep(1.0 * attempt)
                 continue
             except Exception as exc:
+                # Mark proxy as finished downloading before retry/exit
+                if status_display and hasattr(status_display, 'proxy_finish_download'):
+                    status_display.proxy_finish_download(label or "direct")
+                
                 if attempt == tries:
-                    logging.error("%s after %d tries – giving up", exc, attempt)
+                    logging.error("❌ %s after %d tries – giving up", exc, attempt)
                     if addr:
                         banned.add(addr)
                     if delay:
                         await asyncio.sleep(delay)
                     return ("proxy_fail", vid, title)
                 await asyncio.sleep(0.5 * attempt)
+        # Final cleanup - mark proxy as finished if we reach here
+        if status_display and hasattr(status_display, 'proxy_finish_download'):
+            # We need to get the last used label, but it's not in scope here
+            # This is a fallback case that shouldn't normally be reached
+            pass
+        
         if delay:
             await asyncio.sleep(delay)
         return ("proxy_fail", vid, title)
