@@ -130,11 +130,13 @@ async def grab(
     proxy_pool: list[str] | None = None,
     proxy_cfg: GenericProxyConfig | WebshareProxyConfig | None = None,
     banned: set[str] | None = None,
+    used: set[str] | None = None,
     include_stats: bool = True,
     delay: float = 0.0,
 ) -> tuple[str, str, str]:  # (status, video_id, title)
     async with sem:
         banned = banned if banned is not None else set()
+        used = used if used is not None else set()
 
         for attempt in range(1, tries + 1):
             try:
@@ -152,6 +154,14 @@ async def grab(
                         return ("proxy_fail", vid, title)
                 elif proxy_cfg:
                     proxy = proxy_cfg
+
+                label = addr or (
+                    proxy.http_url if isinstance(proxy, GenericProxyConfig) else (
+                        "webshare" if isinstance(proxy, WebshareProxyConfig) else "direct"
+                    )
+                )
+                used.add(label)
+                logging.info("Using proxy %s for %s (attempt %d/%d)", label, vid, attempt, tries)
 
                 session = requests.Session()
                 session.headers.update({"User-Agent": _pick_ua()})
