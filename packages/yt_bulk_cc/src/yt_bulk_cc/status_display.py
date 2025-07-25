@@ -28,6 +28,10 @@ class StatusDisplay:
         self.total_videos = 0
         self.concurrent_jobs = 1
         self.proxies_in_use: list[str] = []
+        self.no_caption_count = 0
+        self.failed_count = 0
+        self.proxy_fail_count = 0
+        self.banned_count = 0
         self.progress: Optional[Progress] = None
         self.progress_task = None
         self._active = False
@@ -98,6 +102,20 @@ class StatusDisplay:
         """Update the list of proxies in use."""
         self.proxies_in_use = proxies[:10]  # Limit to first 10 for display
         self._refresh_display()
+
+    def update_counts(
+        self,
+        no_caption: int,
+        failed: int,
+        proxy_failed: int,
+        banned: int,
+    ) -> None:
+        """Update download outcome counts."""
+        self.no_caption_count = no_caption
+        self.failed_count = failed
+        self.proxy_fail_count = proxy_failed
+        self.banned_count = banned
+        self._refresh_display()
     
     def set_total_videos(self, total: int) -> None:
         """Set the total number of videos and create progress task."""
@@ -135,20 +153,26 @@ class StatusDisplay:
             else:
                 table.add_row("Transcripts Downloaded:", str(self.downloads_count))
             
-            # Concurrent jobs
-            table.add_row("Concurrent Jobs:", str(self.concurrent_jobs))
-            
-            # Proxies in use (only show if there are proxies)
+            # Active proxies count
+            table.add_row("Active Proxies:", str(len(self.proxies_in_use)))
+
+            # Proxies list (limited)
             if self.proxies_in_use:
-                table.add_row("Proxies in use:", str(len(self.proxies_in_use)))
-                
-                # Add proxy list
                 proxy_text = Text()
                 for i, proxy in enumerate(self.proxies_in_use):
                     if i > 0:
                         proxy_text.append("\n")
                     proxy_text.append(f"  • {proxy}", style="dim")
                 table.add_row("", proxy_text)
+
+            # Concurrent jobs
+            table.add_row("Concurrent Jobs:", str(self.concurrent_jobs))
+
+            # Failure counts
+            table.add_row("No Captions:", str(self.no_caption_count))
+            table.add_row("Failed:", str(self.failed_count))
+            table.add_row("Proxy Failures:", str(self.proxy_fail_count))
+            table.add_row("Proxies Banned:", str(self.banned_count))
             
             # Progress bar
             content = [table]
@@ -209,6 +233,21 @@ class FallbackStatusDisplay:
     def update_proxies(self, proxies: list[str]) -> None:
         if proxies:
             logging.info("Using %d proxies", len(proxies))
+
+    def update_counts(
+        self,
+        no_caption: int,
+        failed: int,
+        proxy_failed: int,
+        banned: int,
+    ) -> None:
+        logging.info(
+            "Counts - no_caption=%d failed=%d proxy_failed=%d banned=%d",
+            no_caption,
+            failed,
+            proxy_failed,
+            banned,
+        )
     
     def set_total_videos(self, total: int) -> None:
         logging.info("Processing %d videos", total)

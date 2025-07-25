@@ -311,7 +311,13 @@ async def _main() -> None:
     if args.convert:
         out_dir = Path(args.folder).expanduser()
         out_dir.mkdir(parents=True, exist_ok=True)
+        status_display = create_status_display(Console(file=sys.__stdout__, force_terminal=True))
+        status_display.start()
+        status_display.update_status("Converting transcripts...")
         convert_existing(args.convert, args.format, out_dir, include_stats=args.stats)
+        status_display.update_status("Finished")
+        status_display.stop()
+        print(f"\U0001F4C1 Output Directory: {out_dir.resolve()}")
         return
 
     if not args.LINK:
@@ -440,28 +446,37 @@ async def _main() -> None:
     file_proxies: list[str] = []
     
     if args.proxy:
+        status_display.update_status("Reading CLI proxies...")
         cli_proxies = [p.strip() for p in args.proxy.split(",") if p.strip()]
         proxies.extend(cli_proxies)
         logging.info("Loaded %d proxies from CLI", len(cli_proxies))
+        status_display.update_status(f"Loaded {len(cli_proxies)} CLI proxies")
     
     if args.proxy_file:
+        status_display.update_status("Reading proxy file...")
         try:
             with open(args.proxy_file, "r", encoding="utf-8") as fh:
                 file_proxies = [p.strip() for p in fh if p.strip()]
                 proxies.extend(file_proxies)
                 logging.info("Loaded %d proxies from file %s", len(file_proxies), args.proxy_file)
+            status_display.update_status(f"Loaded {len(file_proxies)} proxies from file")
         except Exception as e:
             logging.error("Cannot read proxy file %s (%s)", args.proxy_file, e)
+            status_display.update_status("Proxy file error")
             sys.exit(1)
     
     # Set up proxy configuration based on custom proxies
     if proxies:
+        status_display.update_status("Initializing custom proxies...")
         if len(proxies) == 1:
             proxy_cfg = _make_proxy(proxies[0])
             logging.info("Using single proxy: %s", proxies[0])
+            status_display.update_status("Custom proxy configured")
         else:
             proxy_pool = proxies
             logging.info("Using proxy pool with %d proxies", len(proxies))
+            status_display.update_proxies(proxies)
+            status_display.update_status(f"Proxy pool ready - {len(proxies)} proxies")
 
     if args.public_proxy and ProxyPool:
         status_display.update_status("Loading public proxies...")
@@ -574,6 +589,7 @@ async def _main() -> None:
         print(f"{C.BLU}⬇️ Status: Downloading transcripts... | {concurrent_info}{proxy_info}{C.END}")
     if not tasks and not skipped and not pre_results:
         logging.info("Nothing to do (all files already present).")
+        status_display.update_status("Finished")
         status_display.stop()
         return
     orig_console_level = console_handler.level
@@ -581,10 +597,29 @@ async def _main() -> None:
     try:
         results = []
         completed_count = 0
+        no_caption_count = 0
+        fail_count = 0
+        proxy_fail_count = 0
+        status_display.update_counts(0, 0, 0, 0)
         for fut in asyncio.as_completed(tasks):
-            results.append(await fut)
+            res = await fut
+            results.append(res)
             completed_count += 1
+            code = res[0]
+            if code == "none":
+                no_caption_count += 1
+            elif code == "fail":
+                fail_count += 1
+            elif code == "proxy_fail":
+                proxy_fail_count += 1
             status_display.update_downloads(completed_count)
+            status_display.update_counts(
+                no_caption_count,
+                fail_count,
+                proxy_fail_count,
+                len(banned_proxies),
+            )
+        status_display.update_status("Finished")
         status_display.stop()
     finally:
         console_handler.setLevel(orig_console_level)
@@ -688,13 +723,20 @@ async def _main() -> None:
             
             # Console summary with emojis - more visually appealing
             total_failed = len(fail) + len(proxy_fail)
-            print(f"Summary: ✓ {C.GRN}{len(ok)}{C.END}   •  ↯ no-caption {C.YEL}{len(none)}{C.END}   •  ⚠ failed {C.RED}{total_failed}{C.END}   🚫 proxies banned {C.RED}{len(banned_proxies)}{C.END}   (total {total})")
+            print(
+                f"Summary: ✓ {C.GRN}{len(ok)}{C.END}   •  ↯ no-caption {C.YEL}{len(none)}{C.END}   "
+                f"•  ⚠ failed {C.RED}{total_failed}{C.END}   "
+                f"🌐 proxies used {C.RED}{len(proxies_used)}{C.END}   "
+                f"🚫 proxies banned {C.RED}{len(banned_proxies)}{C.END}   (total {total})"
+            )
+            print(f"\U0001F4C1 Output Directory: {out_dir.resolve()}")
             print()  # Add spacing after summary
 
     stats_files: list[Path] = []
     _seen_stats: set[Path] = set()
     if args.concat and ok:
         logging.info("Per-file stats are disabled during concatenation")
+        status_display.update_status("Concatenating output...")
         base_name = args.basename
         concat_paths = []
         if args.format == "json":
