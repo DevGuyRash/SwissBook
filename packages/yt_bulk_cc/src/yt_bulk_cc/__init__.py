@@ -106,10 +106,16 @@ if not hasattr(_aio.run, "_nested_patch"):
 
     def _safe_run(coro, *args, **kwargs):  # type: ignore[override]
         try:
-            _aio.get_running_loop()
+            loop = _aio.get_running_loop()
+            # If we're already in a running loop, create a task
+            if loop.is_running():
+                return _aio.create_task(coro)
+            else:
+                # Loop exists but not running, use original run
+                return _orig_run(coro, *args, **kwargs)
         except RuntimeError:
+            # No running event loop, use original run
             return _orig_run(coro, *args, **kwargs)
-        return _aio.create_task(coro)
 
     _safe_run._nested_patch = True  # type: ignore[attr-defined]
     _aio.run = _safe_run  # type: ignore[assignment]

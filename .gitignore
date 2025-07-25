@@ -1,5 +1,6 @@
 *insync*
 *repomix*
+.kiro/
 
 # Created by https://www.toptal.com/developers/gitignore/api/node,venv,virtualenv,dotenv,python,git
 # Edit at https://www.toptal.com/developers/gitignore?templates=node,venv,virtualenv,dotenv,python,git

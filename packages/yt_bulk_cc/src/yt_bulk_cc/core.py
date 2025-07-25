@@ -144,13 +144,20 @@ async def grab(
                 addr = None
                 if proxy_pool and hasattr(proxy_pool, "get"):
                     spin = 0
+                    addr = None
                     while spin < 5:
-                        addr = proxy_pool.get()
-                        if addr not in banned:
+                        try:
+                            addr = proxy_pool.get()
+                            if addr and addr not in banned:
+                                break
+                        except Exception as e:
+                            logging.debug("🚫 Proxy pool get() failed: %s", e)
+                            addr = None
                             break
                         spin += 1
-                    if addr in banned:
-                        logging.error("All sampled proxies banned; abort %s", vid)
+                        await asyncio.sleep(0.1)  # Brief pause between attempts
+                    if not addr or addr in banned:
+                        logging.error("🚫 No available proxies for %s (pool empty or all banned)", vid)
                         return ("proxy_fail", vid, title)
                 elif proxy_cfg:
                     proxy = proxy_cfg
@@ -160,8 +167,9 @@ async def grab(
                         "webshare" if isinstance(proxy, WebshareProxyConfig) else "direct"
                     )
                 )
-                used.add(label)
-                logging.info("Using proxy %s for %s (attempt %d/%d)", label, vid, attempt, tries)
+                if label:
+                    used.add(label)
+                logging.info("🌐 Using proxy %s for %s (attempt %d/%d)", label or "direct", vid, attempt, tries)
 
                 session = requests.Session()
                 session.headers.update({"User-Agent": _pick_ua()})
@@ -250,7 +258,8 @@ async def grab(
             except (TooManyRequests, IpBlocked, CouldNotRetrieveTranscript) as exc:
                 if addr:
                     banned.add(addr)
-                wait = 6 * attempt
+                    logging.info("🚫 Banned proxy %s due to %s", addr, exc.__class__.__name__)
+                wait = 6 * attempt  # Exponential backoff
                 logging.info(
                     "⏳ %s - retrying in %ss (attempt %s/%s)",
                     exc.__class__.__name__,
@@ -263,7 +272,7 @@ async def grab(
             except requests.exceptions.RequestException as exc:
                 logging.debug("Network error for %s via %s: %s", vid, addr or proxy_cfg, exc)
                 if attempt == tries:
-                    logging.error("%s after %d tries – giving up", exc, attempt)
+                    logging.error("❌ %s after %d tries – giving up", exc, attempt)
                     if addr:
                         banned.add(addr)
                     if delay:
@@ -273,7 +282,7 @@ async def grab(
                 continue
             except Exception as exc:
                 if attempt == tries:
-                    logging.error("%s after %d tries – giving up", exc, attempt)
+                    logging.error("❌ %s after %d tries – giving up", exc, attempt)
                     if addr:
                         banned.add(addr)
                     if delay:
