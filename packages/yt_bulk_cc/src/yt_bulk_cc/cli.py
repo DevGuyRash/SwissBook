@@ -128,12 +128,14 @@ async def initialize_proxy_pool(args, status_display):
             if hasattr(proxy_pool, '_proxies') and proxy_pool._proxies:
                 proxy_list = list(proxy_pool._proxies)[:10]  # Limit display
                 status_display.update_proxies(proxy_list)
-                status_display.update_active_proxy_count(len(proxy_list))
+                status_display.update_proxy_pool_total(len(proxy_list))
+                status_display.update_active_proxy_count(0)  # No active downloads yet
                 logging.info("✅ Public proxy pool initialized with %d proxies", len(proxy_list))
                 status_display.update_status(f"✅ Ready - {len(proxy_list)} proxies loaded")
             else:
                 # Fallback: assume some proxies are available
-                status_display.update_active_proxy_count(min(proxy_count, args.public_proxy))
+                status_display.update_proxy_pool_total(min(proxy_count, args.public_proxy))
+                status_display.update_active_proxy_count(0)  # No active downloads yet
                 logging.info("✅ Public proxy pool initialized (lazy loading)")
                 status_display.update_status(f"✅ Ready - proxy pool initialized")
                 
@@ -141,12 +143,14 @@ async def initialize_proxy_pool(args, status_display):
             
         except asyncio.TimeoutError:
             logging.warning("⏰ Proxy pool initialization timed out after 30 seconds")
+            status_display.update_proxy_pool_total(0)
             status_display.update_active_proxy_count(0)
             status_display.update_status("⏰ Proxy loading timed out - continuing without proxies")
             return None
             
     except Exception as e:
         logging.error("❌ Proxy pool initialization failed: %s", e)
+        status_display.update_proxy_pool_total(0)
         status_display.update_active_proxy_count(0)
         status_display.update_status(f"❌ Proxy loading failed - {str(e)}")
         return None
@@ -185,6 +189,11 @@ async def _main() -> None:
     import warnings
     warnings.filterwarnings("ignore", message=".*Bad file descriptor.*", category=ResourceWarning)
     warnings.filterwarnings("ignore", message=".*unclosed.*", category=ResourceWarning)
+    warnings.filterwarnings("ignore", message=".*ClientProxyConnectionError.*", category=RuntimeWarning)
+    
+    # Also suppress SwiftShadow cleanup errors
+    import logging
+    logging.getLogger("swiftshadow").addFilter(lambda record: "Bad file descriptor" not in record.getMessage())
     class _ManFmt(
         argparse.ArgumentDefaultsHelpFormatter, argparse.RawTextHelpFormatter
     ):
@@ -563,13 +572,15 @@ async def _main() -> None:
             proxy_cfg = _make_proxy(proxies[0])
             logging.info("Using single proxy: %s", proxies[0])
             status_display.update_proxies(proxies)
-            status_display.update_active_proxy_count(1)
+            status_display.update_proxy_pool_total(1)
+            status_display.update_active_proxy_count(0)  # No active downloads yet
             status_display.update_status("Custom proxy configured")
         else:
             proxy_pool = proxies
             logging.info("Using proxy pool with %d proxies", len(proxies))
             status_display.update_proxies(proxies)
-            status_display.update_active_proxy_count(len(proxies))
+            status_display.update_proxy_pool_total(len(proxies))
+            status_display.update_active_proxy_count(0)  # No active downloads yet
             status_display.update_status(f"Proxy pool ready - {len(proxies)} proxies")
 
     # Initialize public proxy pool with proper timeout and error handling
@@ -641,6 +652,7 @@ async def _main() -> None:
                 used=proxies_used,
                 include_stats=args.stats and not args.concat,
                 delay=args.sleep,
+                status_display=status_display,
             )
         )
     status_display.update_status("Downloading transcripts...")
@@ -804,6 +816,7 @@ async def _main() -> None:
                     print(f"{C.RED}• ...and {len(proxy_fail) - args.summary_max_failed} more{C.END}")
             
             if proxies_used:
+                print()  # Add spacer before proxies used section
                 used_limited = list(sorted(proxies_used))[:args.summary_max_proxies]
                 print(f"{C.RED}Proxies Used:{C.END}")
                 for proxy in used_limited:
@@ -811,12 +824,18 @@ async def _main() -> None:
                 if len(proxies_used) > args.summary_max_proxies:
                     print(f"{C.RED}• ...and {len(proxies_used) - args.summary_max_proxies} more{C.END}")
             
+            # Add spacer before summary
+            print()
+            
+            # Summary header with color
+            print(f"{C.BLU}Summary{C.END}")
+            
             # Console summary with emojis - more visually appealing
             total_failed = len(fail) + len(proxy_fail)
             print(
-                f"Summary: ✓ {C.GRN}{len(ok)}{C.END}   •  ↯ no-caption {C.YEL}{len(none)}{C.END}   "
-                f"•  ⚠ failed {C.RED}{total_failed}{C.END}   "
-                f"🌐 proxies used {C.RED}{len(proxies_used)}{C.END}   "
+                f"✓ successful {C.GRN}{len(ok)}{C.END}   •  ↯ no-caption {C.YEL}{len(none)}{C.END}   "
+                f"•  ⚠ failed {C.RED}{total_failed}{C.END}   •  "
+                f"🌐 proxies used {C.RED}{len(proxies_used)}{C.END}   •  "
                 f"🚫 proxies banned {C.RED}{len(banned_proxies)}{C.END}   (total {total})"
             )
             print(f"📁 Output Directory: {out_dir.resolve()}")

@@ -29,7 +29,8 @@ class StatusDisplay:
         self.total_videos = 0
         self.concurrent_jobs = 1
         self.proxies_in_use: list[str] = []
-        self.active_proxy_count = 0
+        self.proxy_pool_total = 0  # Total proxies scraped/available
+        self.active_proxy_count = 0  # Proxies currently being used for downloads
         self.proxies_used_count = 0
         self.no_caption_count = 0
         self.failed_count = 0
@@ -38,6 +39,7 @@ class StatusDisplay:
         self.progress: Optional[Progress] = None
         self.progress_task = None
         self._active = False
+        self._currently_active_proxies: set[str] = set()  # Track proxies in active use
         
     def start(self) -> None:
         """Start the dynamic status display."""
@@ -111,10 +113,29 @@ class StatusDisplay:
         self.proxies_in_use = proxies[:10]  # Limit to first 10 for display
         self._refresh_display()
     
+    def update_proxy_pool_total(self, count: int) -> None:
+        """Update the total number of proxies in the pool."""
+        self.proxy_pool_total = count
+        self._refresh_display()
+    
     def update_active_proxy_count(self, count: int) -> None:
         """Update the count of currently active/working proxies."""
         self.active_proxy_count = count
         self._refresh_display()
+    
+    def proxy_start_download(self, proxy: str) -> None:
+        """Mark a proxy as actively downloading."""
+        if proxy and proxy != "direct":
+            self._currently_active_proxies.add(proxy)
+            self.active_proxy_count = len(self._currently_active_proxies)
+            self._refresh_display()
+    
+    def proxy_finish_download(self, proxy: str) -> None:
+        """Mark a proxy as finished downloading."""
+        if proxy and proxy != "direct":
+            self._currently_active_proxies.discard(proxy)
+            self.active_proxy_count = len(self._currently_active_proxies)
+            self._refresh_display()
     
     def update_proxies_used_count(self, count: int) -> None:
         """Update the count of proxies that have been used."""
@@ -157,14 +178,14 @@ class StatusDisplay:
         try:
             # Create main status table with proper alignment
             table = Table.grid(padding=(0, 1))
-            table.add_column(style="bold blue", width=25)  # Fixed width for labels
+            table.add_column(style="bold", width=25)  # Fixed width for labels
             table.add_column()
             
-            # Status line
+            # === OVERVIEW SECTION ===
+            table.add_row(Text("Overview", style="bold cyan"), "")
             table.add_row("Status:", self.status_message)
-            table.add_row("", "")  # Spacing
+            table.add_row("⚡ Concurrent Jobs:", str(self.concurrent_jobs))
             
-            # === DOWNLOAD METRICS ===
             # Downloads progress
             if self.total_videos > 0:
                 progress_text = f"{self.downloads_count}/{self.total_videos}"
@@ -173,18 +194,23 @@ class StatusDisplay:
             else:
                 table.add_row("📊 Transcripts Processed:", str(self.downloads_count))
             
-            # Successful downloads
-            table.add_row("✅ Successful Downloads:", str(self.successful_downloads))
-            
-            # Concurrent jobs
-            table.add_row("⚡ Concurrent Jobs:", str(self.concurrent_jobs))
             table.add_row("", "")  # Spacing
 
-            # === PROXY METRICS ===
-            # Active proxies count
-            table.add_row("🌐 Active Proxies:", str(self.active_proxy_count))
+            # === RESULTS SECTION ===
+            table.add_row(Text("Results", style="bold green"), "")
+            table.add_row("✅ Successful Downloads:", str(self.successful_downloads))
+            table.add_row("⚠ Failed Downloads:", str(self.failed_count))
+            table.add_row("↯ No Captions:", str(self.no_caption_count))
+            
+            table.add_row("", "")  # Spacing
+
+            # === PROXY OVERVIEW SECTION ===
+            table.add_row(Text("Proxy Overview", style="bold magenta"), "")
+            table.add_row("🌐 Proxy Pool Total:", str(self.proxy_pool_total))
+            table.add_row("🔄 Active Proxies:", str(self.active_proxy_count))
             table.add_row("🔄 Proxies Used:", str(self.proxies_used_count))
             table.add_row("🚫 Proxies Banned:", str(self.banned_count))
+            table.add_row("🌐 Proxy Failures:", str(self.proxy_fail_count))
 
             # Proxies list (limited)
             if self.proxies_in_use:
@@ -195,16 +221,12 @@ class StatusDisplay:
                     proxy_text.append(f"  • {proxy}", style="dim")
                 table.add_row("   Proxy List:", proxy_text)
             
-            table.add_row("", "")  # Spacing
-
-            # === FAILURE METRICS ===
-            table.add_row("↯ No Captions:", str(self.no_caption_count))
-            table.add_row("⚠ Failed Downloads:", str(self.failed_count))
-            table.add_row("🌐 Proxy Failures:", str(self.proxy_fail_count))
-            
-            # Progress bar
+            # Progress bar with label and spacing
             content = [table]
             if self.progress and self.progress_task is not None:
+                # Add spacing and progress label
+                table.add_row("", "")  # Spacing before progress
+                table.add_row(Text("Progress:", style="bold yellow"), "")
                 content.append(self.progress)
 
             try:
@@ -262,9 +284,21 @@ class FallbackStatusDisplay:
         if proxies:
             logging.info("Using %d proxies", len(proxies))
     
+    def update_proxy_pool_total(self, count: int) -> None:
+        """Update the total number of proxies in the pool."""
+        logging.info("Proxy pool total: %d", count)
+    
     def update_active_proxy_count(self, count: int) -> None:
         """Update the count of currently active/working proxies."""
         logging.info("Active proxies: %d", count)
+    
+    def proxy_start_download(self, proxy: str) -> None:
+        """Mark a proxy as actively downloading."""
+        pass
+    
+    def proxy_finish_download(self, proxy: str) -> None:
+        """Mark a proxy as finished downloading."""
+        pass
     
     def update_proxies_used_count(self, count: int) -> None:
         """Update the count of proxies that have been used."""

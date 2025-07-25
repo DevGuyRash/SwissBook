@@ -405,6 +405,13 @@ def test_public_proxy(monkeypatch, tmp_path: Path):
 
     monkeypatch.setattr(ytb.cli, "QuickProxy", _qp)
 
+    # Mock initialize_proxy_pool to return a ProxyPool
+    async def _fake_initialize_proxy_pool(args, status_display):
+        from site_downloader.proxy import ProxyPool
+        return ProxyPool(max_proxies=3, cache_minutes=10, verbose=False)
+
+    monkeypatch.setattr(ytb.cli, "initialize_proxy_pool", _fake_initialize_proxy_pool)
+
     async def _fake_grab(*_a, **kw):
         captured["pool"] = kw.get("proxy_pool")
         return ("ok", "x", "t")
@@ -604,6 +611,13 @@ def test_public_proxy_validation_fail(monkeypatch, tmp_path: Path):
         raise Exception("boom")
 
     monkeypatch.setattr(ytb.requests, "get", fake_get)
+
+    # Mock initialize_proxy_pool to return a ProxyPool even when validation fails
+    async def _fake_initialize_proxy_pool(args, status_display):
+        from site_downloader.proxy import ProxyPool
+        return ProxyPool(max_proxies=1, cache_minutes=10, verbose=False)
+
+    monkeypatch.setattr(ytb.cli, "initialize_proxy_pool", _fake_initialize_proxy_pool)
 
     captured = {}
 
